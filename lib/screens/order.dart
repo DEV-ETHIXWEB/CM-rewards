@@ -734,15 +734,15 @@ Future<void> showCheckoutSheet(BuildContext context) {
             const SizedBox(height: 10),
             ListGroup(
               children: [
-                for (final method in paymentMethods)
+                for (final method in state.availablePaymentMethods)
                   ListRow(
                     icon: method.icon,
                     title: method.label,
                     subtitle: method.detail,
                     onTap: () => state.setDefaultPayment(method.id),
                     trailing: CMIcon(
-                      state.defaultPayment == method.id ? CMGlyph.radioOn : CMGlyph.radioOff,
-                      color: state.defaultPayment == method.id ? c.primaryInk : c.hint,
+                      state.payment.id == method.id ? CMGlyph.radioOn : CMGlyph.radioOff,
+                      color: state.payment.id == method.id ? c.primaryInk : c.hint,
                     ),
                   ),
               ],
@@ -765,7 +765,7 @@ Future<void> showCheckoutSheet(BuildContext context) {
               label: 'Place order',
               trailing: Text(formatMoney(subtotal + tax), style: const TextStyle(fontFeatures: AppText.tabular)),
               onPressed: () {
-                final method = paymentMethods.firstWhere((m) => m.id == state.defaultPayment);
+                final method = state.payment;
                 final order = state.placeOrder(
                   storeNumber: store.number,
                   pickupMinutes: pickupOptions[pickup].$1,

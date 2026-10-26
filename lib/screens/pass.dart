@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../core/config.dart';
 import '../core/format.dart';
 import '../core/responsive.dart';
 import '../core/theme.dart';
@@ -321,15 +320,20 @@ class _MemberPassScreenState extends State<MemberPassScreen> {
         else
           _onDarkRow(CMGlyph.sun, 'Turn up your brightness', 'It helps the scanner read your code faster.'),
         const SizedBox(height: 18),
-        PrimaryButton(
-          label: Theme.of(context).platform == TargetPlatform.iOS ? 'Add to Apple Wallet' : 'Add to Google Wallet',
-          icon: CMGlyph.wallet,
-          tone: ButtonTone.dark,
-          height: 54,
-          onPressed: () => showToast(context, 'Pass added to your wallet', icon: CMGlyph.wallet),
-        ),
-        const SizedBox(height: 6),
-        if (AppConfig.demo)
+        // A real wallet pass is signed by the server (see docs/backend-api.md),
+        // so only the demo shows the button.
+        if (RewardsScope.of(context).isDemo) ...[
+          PrimaryButton(
+            label: Theme.of(context).platform == TargetPlatform.iOS ? 'Add to Apple Wallet' : 'Add to Google Wallet',
+            icon: CMGlyph.wallet,
+            tone: ButtonTone.dark,
+            height: 54,
+            onPressed: () =>
+                showToast(context, 'Demo: real passes come from the CM Rewards server', icon: CMGlyph.wallet),
+          ),
+          const SizedBox(height: 6),
+        ],
+        if (RewardsScope.of(context).isDemo)
           TextButton.icon(
             onPressed: _scanning ? null : _simulateScan,
             style: TextButton.styleFrom(foregroundColor: Brand.white.withValues(alpha: 0.85)),

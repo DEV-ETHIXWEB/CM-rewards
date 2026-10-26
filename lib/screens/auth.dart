@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../core/config.dart';
 import '../core/format.dart';
 import '../core/responsive.dart';
 import '../core/theme.dart';
+import '../data/auth_api.dart';
 import '../data/catalog.dart';
 import '../state/rewards_state.dart';
 import '../widgets/brand.dart';
@@ -44,6 +44,22 @@ void enterApp(BuildContext context, {bool personalize = false}) {
   );
 }
 
+/// What to tell the member when a sign-in step fails.
+String authFailureMessage(AuthException e, {bool deleting = false}) => switch (e.failure) {
+  AuthFailure.invalidCode => 'That code didn’t work.',
+  AuthFailure.invalidPhone => 'Enter a valid US mobile number',
+  AuthFailure.rateLimited => 'Too many tries. Please wait a few minutes and try again.',
+  AuthFailure.network => 'Couldn’t connect. Check your connection and try again.',
+  AuthFailure.server =>
+    deleting
+        ? 'We couldn’t delete your account right now. Please try again.'
+        : 'Something went wrong. Please try again.',
+  AuthFailure.unavailable =>
+    deleting
+        ? 'Account deletion isn’t available right now. Contact Center Market support.'
+        : 'Sign-in isn’t available yet. Please check back soon.',
+};
+
 // ─── Login ────────────────────────────────────────────────────────────────────
 
 const _pitches = [
@@ -63,6 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phone = TextEditingController();
   final _focus = FocusNode();
   bool _sending = false;
+  String? _sendError;
   int _pitch = 0;
   Timer? _rotate;
 
@@ -75,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _phone.addListener(() => setState(() {}));
+    _phone.addListener(() => setState(() => _sendError = null));
     _focus.addListener(() => setState(() {}));
     _rotate = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_focus.hasFocus) setState(() => _pitch = (_pitch + 1) % _pitches.length);
@@ -92,11 +109,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _sendCode() async {
     FocusScope.of(context).unfocus();
-    setState(() => _sending = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    final digits = _digits;
+    setState(() {
+      _sending = true;
+      _sendError = null;
+    });
+    try {
+      await RewardsScope.read(context).auth.requestCode(digits);
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _sendError = authFailureMessage(e);
+        });
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() => _sending = false);
-    fireAndForget(push<void>(context, OtpScreen(phoneDigits: _digits)));
+    fireAndForget(push<void>(context, OtpScreen(phoneDigits: digits)));
   }
 
   void _demoMode() {
@@ -196,7 +227,7 @@ class _LoginScreenState extends State<LoginScreen> {
           reveal(1, Text("It's free. We'll text you a code.", style: TextStyle(color: c.muted, fontSize: 14.5))),
           const SizedBox(height: 18),
           reveal(2, _phoneField(c)),
-          if (_phoneProblem case final problem?) ...[
+          if (_phoneProblem ?? _sendError case final problem?) ...[
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.only(left: 6),
@@ -208,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
           const SizedBox(height: 14),
           reveal(3, PrimaryButton(label: 'Continue', loading: _sending, onPressed: _isValid ? _sendCode : null)),
-          if (AppConfig.demo) ...[
+          if (RewardsScope.of(context).isDemo) ...[
             const SizedBox(height: 18),
             reveal(
               4,
@@ -413,7 +444,7 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
 
-  void _resend() {
+  Future<void> _resend() async {
     if (_resends >= _maxResends) {
       setState(() => _error = 'Too many codes requested. Please try again later.');
       return;
@@ -424,44 +455,68 @@ class _OtpScreenState extends State<OtpScreen> {
       _error = null;
       _code.clear();
     });
+    try {
+      await RewardsScope.read(context).auth.requestCode(widget.phoneDigits);
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = authFailureMessage(e));
+      return;
+    }
+    if (!mounted) return;
     showToast(context, 'New code sent to +1 ${formatPhone(widget.phoneDigits)}', icon: CMGlyph.chat);
   }
-
-  /// Without a backend, any code but 000000 passes, so the error path can be tried.
-  bool _codeAccepted(String code) => code != '000000';
 
   Future<void> _verify() async {
     if (_code.text.length != _length || _verifying || _locked) return;
     FocusScope.of(context).unfocus();
+    final state = RewardsScope.read(context);
     setState(() {
       _verifying = true;
       _error = null;
     });
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    if (!_codeAccepted(_code.text)) {
-      _attempts++;
-      final left = _maxAttempts - _attempts;
-      setState(() {
-        _verifying = false;
-        _code.clear();
-        if (left <= 0) {
-          _attempts = 0;
-          _lockedUntil = DateTime.now().add(_lockout);
-          _error = 'Too many tries. Please wait a minute and try again.';
-        } else {
-          _error = 'That code didn’t work. $left ${left == 1 ? 'try' : 'tries'} left.';
-        }
-      });
-      unawaited(HapticFeedback.heavyImpact());
+    final AuthSession session;
+    try {
+      session = await state.auth.verifyCode(widget.phoneDigits, _code.text);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      _rejected(e);
       return;
     }
+    if (!mounted) return;
     setState(() => _verified = true);
-    RewardsScope.read(context).haptic(strong: true);
+    state.haptic(strong: true);
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
-    RewardsScope.read(context).signIn(widget.phoneDigits);
+    state.signIn(widget.phoneDigits, session: session);
     enterApp(context, personalize: true);
+  }
+
+  void _rejected(AuthException e) {
+    setState(() {
+      _verifying = false;
+      _code.clear();
+      switch (e.failure) {
+        case AuthFailure.invalidCode:
+          _attempts++;
+          // The server's count wins when it sends one.
+          final left = e.attemptsLeft ?? _maxAttempts - _attempts;
+          if (left <= 0) {
+            _lock();
+          } else {
+            _error = 'That code didn’t work. $left ${left == 1 ? 'try' : 'tries'} left.';
+          }
+        case AuthFailure.rateLimited:
+          _lock();
+        default:
+          _error = authFailureMessage(e);
+      }
+    });
+    unawaited(HapticFeedback.heavyImpact());
+  }
+
+  void _lock() {
+    _attempts = 0;
+    _lockedUntil = DateTime.now().add(_lockout);
+    _error = 'Too many tries. Please wait a minute and try again.';
   }
 
   Widget _codeBoxes(CMColors c) {
@@ -597,7 +652,7 @@ class _OtpScreenState extends State<OtpScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                if (AppConfig.demo)
+                if (RewardsScope.of(context).isDemo)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(color: c.positiveSoft, borderRadius: BorderRadius.circular(12)),
@@ -679,7 +734,11 @@ class _PersonalizeScreenState extends State<PersonalizeScreen> {
       homeStore: _store,
     );
     enterApp(context);
-    showToast(context, 'Welcome to CM Rewards, ${state.firstName}!', icon: CMGlyph.sparkle);
+    showToast(
+      context,
+      state.firstName.isEmpty ? 'Welcome to CM Rewards!' : 'Welcome to CM Rewards, ${state.firstName}!',
+      icon: CMGlyph.sparkle,
+    );
   }
 
   @override

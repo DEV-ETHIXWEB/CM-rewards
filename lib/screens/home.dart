@@ -83,10 +83,10 @@ class HomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${_greeting()},',
+            state.firstName.isEmpty ? _greeting() : '${_greeting()},',
             style: TextStyle(fontSize: 15, color: c.muted, fontWeight: FontWeight.w600),
           ),
-          Text(state.firstName, style: AppText.display),
+          Text(state.firstName.isEmpty ? 'Welcome' : state.firstName, style: AppText.display),
         ],
       ),
     );

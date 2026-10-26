@@ -6,24 +6,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/errors.dart';
 import '../core/format.dart';
+import '../data/auth_api.dart';
 import '../data/catalog.dart';
 import '../data/models.dart';
 import 'storage.dart';
 
 class RewardsState extends ChangeNotifier {
-  RewardsState([this._store]) {
+  RewardsState([this._store, AuthApi? auth]) : auth = auth ?? AuthApi.forBuild() {
     _applyDefaults();
   }
 
+  /// Sign-in for this build: simulated in demo builds, the server otherwise.
+  final AuthApi auth;
+
+  /// Demo builds open on a sample member, with simulated codes and scans.
+  bool get isDemo => auth.isDemo;
+
+  /// The server session, kept in the same encrypted store as the rest.
+  String? sessionToken;
+
   /// Loads saved member data from encrypted storage, migrating anything an
   /// older version of the app left in plain preferences.
-  static Future<RewardsState> load({KeyValueStore store = const SecureStore()}) async {
+  static Future<RewardsState> load({KeyValueStore store = const SecureStore(), AuthApi? auth}) async {
     String? raw;
     try {
       raw = await store.read(storageKey);
-    } catch (_) {
+    } catch (error, stack) {
       // Unreadable keychain or keystore entry: start fresh rather than crash.
+      ErrorReporting.report(error, stack);
       raw = null;
     }
     SharedPreferences? prefs;
@@ -35,7 +47,7 @@ class RewardsState extends ChangeNotifier {
         prefs = null;
       }
     }
-    final state = RewardsState(store).._restore(raw);
+    final state = RewardsState(store, auth).._restore(raw);
     if (prefs != null && raw != null) {
       // Moved into encrypted storage; remove the plain-text copies.
       await prefs.remove(_plainStorageKey);
@@ -205,16 +217,17 @@ class RewardsState extends ChangeNotifier {
 
     signedIn = false;
     profileComplete = false;
-    name = 'Akash';
+    sessionToken = null;
+    name = '';
     email = '';
-    phoneDigits = '5551234567';
-    memberSince = DateTime(2024, 3, 14);
+    phoneDigits = '';
+    memberSince = DateTime(now.year, now.month, now.day);
     birthday = null;
-    points = 2340;
-    lifetimePoints = 4860;
-    visits = 24;
-    redeemedCount = 3;
-    savedCents = 4275;
+    points = 0;
+    lifetimePoints = 0;
+    visits = 0;
+    redeemedCount = 0;
+    savedCents = 0;
     themeMode = ThemeMode.system;
     hapticsEnabled = true;
     soundsEnabled = true;
@@ -226,16 +239,33 @@ class RewardsState extends ChangeNotifier {
     personalizedOffers = true;
     locationAccess = true;
     homeStore = 1;
-    defaultPayment = paymentMethods.first.id;
-    interests = {'coffee', 'pizza'};
-    favoriteStores = {1};
+    defaultPayment = availablePaymentMethods.first.id;
+    interests = {};
+    favoriteStores = {};
     clippedDeals = {};
-    readNotifications = {'n4', 'n5'};
+    readNotifications = {};
     dismissedNotifications = {};
     _pickupStore = null;
     orders.clear();
     cart.clear();
     _wallet.clear();
+    transactions = [];
+    // Real members start from zero; the demo opens on a sample member.
+    if (isDemo) _applyDemoMember(ago);
+  }
+
+  void _applyDemoMember(DateTime Function(int days, int hour) ago) {
+    name = 'Akash';
+    phoneDigits = '5551234567';
+    memberSince = DateTime(2024, 3, 14);
+    points = 2340;
+    lifetimePoints = 4860;
+    visits = 24;
+    redeemedCount = 3;
+    savedCents = 4275;
+    interests = {'coffee', 'pizza'};
+    favoriteStores = {1};
+    readNotifications = {'n4', 'n5'};
     transactions = [
       PointsTransaction(
         type: TxType.purchase,
@@ -358,6 +388,9 @@ class RewardsState extends ChangeNotifier {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final schema = json['schema'] as int? ?? 1;
       signedIn = json['signedIn'] as bool;
+      sessionToken = json['session'] as String?;
+      // A real build only trusts a sign-in the server vouched for.
+      if (!isDemo && sessionToken == null) signedIn = false;
       profileComplete = json['profileComplete'] as bool? ?? true;
       name = json['name'] as String;
       email = json['email'] as String? ?? '';
@@ -381,7 +414,9 @@ class RewardsState extends ChangeNotifier {
       personalizedOffers = json['personalized'] as bool? ?? true;
       locationAccess = json['location'] as bool? ?? true;
       homeStore = json['homeStore'] as int? ?? 1;
-      defaultPayment = json['payment'] as String? ?? defaultPayment;
+      final payment = json['payment'] as String?;
+      // A saved choice this build can't take (a demo card) falls back to the first option.
+      if (availablePaymentMethods.any((m) => m.id == payment)) defaultPayment = payment!;
       interests = (json['interests'] as List<dynamic>? ?? []).cast<String>().toSet();
       transactions = (json['transactions'] as List<dynamic>)
           .map((e) => PointsTransaction.fromJson(e as Map<String, dynamic>))
@@ -479,6 +514,7 @@ class RewardsState extends ChangeNotifier {
     final data = jsonEncode({
       'schema': schemaVersion,
       'signedIn': signedIn,
+      'session': ?sessionToken,
       'profileComplete': profileComplete,
       'name': name,
       'email': email,
@@ -527,9 +563,18 @@ class RewardsState extends ChangeNotifier {
     unawaited(strong ? HapticFeedback.mediumImpact() : HapticFeedback.selectionClick());
   }
 
-  void signIn(String digits, {bool skipProfile = false}) {
+  PaymentMethod get payment =>
+      availablePaymentMethods.firstWhere((m) => m.id == defaultPayment, orElse: () => availablePaymentMethods.first);
+
+  /// Payment options this build can actually take. Card and wallet payments
+  /// need the payment processor; until then real builds take payment at pickup.
+  List<PaymentMethod> get availablePaymentMethods =>
+      isDemo ? paymentMethods : paymentMethods.where((m) => m.id == 'store').toList();
+
+  void signIn(String digits, {bool skipProfile = false, AuthSession? session}) {
     signedIn = true;
     phoneDigits = digits;
+    sessionToken = session?.token;
     if (skipProfile) profileComplete = true;
     _commit();
   }
@@ -543,7 +588,19 @@ class RewardsState extends ChangeNotifier {
     _commit();
   }
 
-  void signOut() {
+  /// Signs out on this device, and tells the server when there's a session.
+  Future<void> signOut() async {
+    final token = sessionToken;
+    _applyDefaults();
+    _commit();
+    if (token != null) await auth.signOut(AuthSession(token));
+  }
+
+  /// Deletes the account on the server, then everything on this device.
+  /// Throws [AuthException] and keeps the account if the server can't.
+  Future<void> deleteAccount() async {
+    final token = sessionToken;
+    if (token != null) await auth.deleteAccount(AuthSession(token));
     _applyDefaults();
     _commit();
   }
