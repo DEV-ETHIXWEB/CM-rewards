@@ -32,6 +32,20 @@ To try the real sign-in against a local server:
 `flutter run --dart-define=CM_API_URL=http://127.0.0.1:8080` (plain HTTP is
 allowed only for this machine).
 
+### Web demo
+
+The demo also runs in a browser, so it can be shared as a link (Safari on
+iPhone and iPad included):
+
+```sh
+flutter build web --release --dart-define=CM_DEMO=true   # output: build/web
+```
+
+`build/web` is a static site: upload it to any static host (Netlify Drop,
+Firebase Hosting, Cloudflare Pages). The web build talks to servers through
+the browser (`lib/data/platform_http_web.dart`); native builds keep their own
+client (`platform_http_io.dart`).
+
 ## Points economy
 
 | | |

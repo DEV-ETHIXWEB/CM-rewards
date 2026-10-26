@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cupertino_http/cupertino_http.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/config.dart';
+import 'platform_http.dart';
 
 /// Why a sign-in step failed, so the screen can say something useful.
 enum AuthFailure {
@@ -129,10 +129,7 @@ class UnavailableAuthApi implements AuthApi {
 /// operating system (see ITSAppUsesNonExemptEncryption in ios/Runner/Info.plist).
 class HttpAuthApi implements AuthApi {
   HttpAuthApi(this.baseUrl, {http.Client? client, this.timeout = const Duration(seconds: 15)})
-    : _client = client ?? _platformClient();
-
-  static http.Client _platformClient() =>
-      Platform.isIOS || Platform.isMacOS ? CupertinoClient.defaultSessionConfiguration() : http.Client();
+    : _client = client ?? platformHttpClient();
 
   final Uri baseUrl;
   final Duration timeout;

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Replaced by the value of `flutter build web --base-href`. -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Interactive demo of the Center Market rewards app. Sample data only.">
+  <meta name="theme-color" content="#FAF6F1">
+
+  <!-- Add to Home Screen on iPhone and iPad -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CM Rewards">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>CM Rewards Demo</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Matches the native launch screen: the logo on ivory while the app loads. */
+    html, body { margin: 0; height: 100%; background: #FAF6F1; }
+    #cm-splash {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: #FAF6F1; transition: opacity 300ms ease; z-index: 10;
+    }
+    #cm-splash img { width: min(44vw, 220px); height: auto; }
+    #cm-splash.done { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="cm-splash" aria-hidden="true"><img src="splash-logo.png" alt=""></div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('cm-splash');
+      splash.classList.add('done');
+      setTimeout(function () { splash.remove(); }, 400);
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
