@@ -71,3 +71,4 @@ google-services.json
 
 # Built release artifacts
 /dist/
+/demo-release/
