@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cupertino_http/cupertino_http.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/config.dart';
@@ -123,10 +124,15 @@ class UnavailableAuthApi implements AuthApi {
   Future<void> deleteAccount(AuthSession session) async => throw const AuthException(AuthFailure.unavailable);
 }
 
-/// Talks to the CM Rewards server over HTTPS (TLS from the Flutter engine).
+/// Talks to the CM Rewards server over HTTPS. On iOS the connection goes
+/// through Apple's URLSession, so the app's encryption stays within the
+/// operating system (see ITSAppUsesNonExemptEncryption in ios/Runner/Info.plist).
 class HttpAuthApi implements AuthApi {
   HttpAuthApi(this.baseUrl, {http.Client? client, this.timeout = const Duration(seconds: 15)})
-    : _client = client ?? http.Client();
+    : _client = client ?? _platformClient();
+
+  static http.Client _platformClient() =>
+      Platform.isIOS || Platform.isMacOS ? CupertinoClient.defaultSessionConfiguration() : http.Client();
 
   final Uri baseUrl;
   final Duration timeout;

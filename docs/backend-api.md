@@ -16,6 +16,7 @@ What the app expects from the CM Rewards server. The client is
 | Card and Apple Pay payments | Hidden outside demo builds | Not built yet: needs a payment processor |
 | Apple Wallet / Google Wallet pass | Hidden outside demo builds | Not built yet: passes must be signed server-side |
 | Stores, menu, offers, rewards catalog | Bundled sample content in `lib/data/catalog.dart` | Real content needed |
+| Member pass code | Real QR and Code 128 of the member number, e.g. `CM5035550123` | Registers must look members up by this number; a signed rotating code is optional hardening |
 | Notifications, challenge progress | Sample ones show only in demo builds | Push service and challenge tracking |
 
 Until the "not built yet" rows exist, a real build can sign members in but

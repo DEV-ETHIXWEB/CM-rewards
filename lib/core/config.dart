@@ -13,6 +13,12 @@ class AppConfig {
   /// Must be HTTPS; plain HTTP is accepted only for this machine, in tests.
   static Uri? get apiBaseUrl => parseApiUrl(const String.fromEnvironment('CM_API_URL'));
 
+  /// Published privacy policy and terms of use, from `--dart-define=CM_PRIVACY_URL=https://...`
+  /// and `CM_TERMS_URL`. Release builds require both (scripts/build_release.sh);
+  /// without them the app shows no legal links rather than a wrong page.
+  static Uri? get privacyPolicyUrl => parseLegalUrl(const String.fromEnvironment('CM_PRIVACY_URL'));
+  static Uri? get termsUrl => parseLegalUrl(const String.fromEnvironment('CM_TERMS_URL'));
+
   /// Sentry project DSN, from `--dart-define=CM_SENTRY_DSN=...`. Without it,
   /// crash reporting stays off.
   static const sentryDsn = String.fromEnvironment('CM_SENTRY_DSN');
@@ -22,6 +28,12 @@ class AppConfig {
     'CM_ENV',
     defaultValue: kReleaseMode ? (demo ? 'demo' : 'production') : 'development',
   );
+
+  @visibleForTesting
+  static Uri? parseLegalUrl(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty ? uri : null;
+  }
 
   @visibleForTesting
   static Uri? parseApiUrl(String value) {

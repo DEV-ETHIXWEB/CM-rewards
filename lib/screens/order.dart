@@ -962,7 +962,7 @@ class OrderTrackerScreen extends StatelessWidget {
                               child: SizedBox(
                                 width: 130,
                                 height: 130,
-                                child: CustomPaint(painter: QrPainter(seed: order.number * 7919)),
+                                child: CustomPaint(painter: QrPainter(data: 'CM-ORDER-${order.number}')),
                               ),
                             ),
                             const SizedBox(height: 12),

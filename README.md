@@ -109,6 +109,7 @@ State lives in one `RewardsState`, reached through `RewardsScope.of(context)`
 flutter test                                       # everything below
 flutter test test/device_matrix_test.dart          # layout on 10 devices
 flutter test integration_test -d <simulator-id> --dart-define=TOUR_THEME=dark   # every screen, for screenshots
+flutter test integration_test/auth_network_test.dart -d <device-id>          # sign-in over the platform's HTTPS stack
 ```
 
 - `widget_test.dart`: the main flows (sign-in, scanning, redeeming, Order
@@ -158,6 +159,7 @@ What the app does on the device:
   same encrypted store.
 - Crash reports (Sentry) carry no user, IP address, screenshot or view
   hierarchy.
+- iOS network traffic uses Apple's URLSession and its TLS; Android uses Dart's.
 - Double-tap protection on every button, so nothing is redeemed or ordered
   twice.
 - Input validation and limits on names, emails and gifts (no gifting to
@@ -172,20 +174,27 @@ QR code, and make each reward code single-use.
 ## Release builds
 
 ```sh
-DEMO=true scripts/build_release.sh apk                        # demo APK for sales and testing
-CM_API_URL=https://api.example.com scripts/build_release.sh ipa        # App Store
-CM_API_URL=https://api.example.com scripts/build_release.sh appbundle  # Google Play
+DEMO=true scripts/build_release.sh apk     # demo APK for sales and testing
+
+export CM_API_URL=https://<your server>
+export CM_PRIVACY_URL=https://<published privacy policy>
+export CM_TERMS_URL=https://<published terms of use>
+scripts/build_release.sh appbundle         # Google Play
+scripts/build_release.sh ipa               # App Store
 ```
 
-The script runs the analyzer and tests first, refuses a non-demo build
-without an HTTPS `CM_API_URL`, and builds obfuscated with symbols in
-`build/symbols`. Other settings, all optional:
+The script runs the analyzer and tests first, then builds obfuscated, with
+symbols in `build/symbols` and the obfuscation map in
+`build/app/obfuscation.map.json` (keep both; never ship them). Non-demo
+builds are refused without HTTPS `CM_API_URL`, `CM_PRIVACY_URL` and
+`CM_TERMS_URL`: there's no sign-in without the server, and both stores
+require a privacy policy for apps with accounts. Optional:
 
 | Variable | Effect |
 | --- | --- |
-| `CM_SENTRY_DSN` | Turns on crash reporting (Sentry). |
+| `CM_SENTRY_DSN` | Turns on crash reporting (Sentry). A bad DSN never stops the app from starting. |
 | `CM_ENV` | Crash report environment; defaults to `production` (or `demo`). |
-| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | With `sentry-cli` installed, uploads `build/symbols` so obfuscated crashes are readable. |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | After the build, `sentry_dart_plugin` uploads the debug symbols, dSYMs and obfuscation map so crash reports show real names (settings: `sentry:` in `pubspec.yaml`). |
 
 ### iOS
 
@@ -199,27 +208,27 @@ without an HTTPS `CM_API_URL`, and builds obfuscated with symbols in
    `ios/Runner/PrivacyInfo.xcprivacy`: Phone Number (linked, app
    functionality) and Crash Data and Other Diagnostic Data (not linked, app
    functionality, only if Sentry is on). No tracking.
-5. Export compliance: the app's HTTPS uses standard TLS built into the Flutter
-   engine, not Apple's. Apple treats that as "an industry standard algorithm,
-   not provided within the Apple operating system", which needs a French
-   encryption declaration only for distribution in France. For a US-only
-   release, add `ITSAppUsesNonExemptEncryption` = `NO` to
-   `ios/Runner/Info.plist`; otherwise answer the questions in App Store
-   Connect and upload the declaration.
+5. Export compliance is declared in `ios/Runner/Info.plist`
+   (`ITSAppUsesNonExemptEncryption` = `NO`): on iOS every encrypted
+   connection goes through Apple's URLSession (the server client through
+   `cupertino_http`, Sentry through its native SDK) and member data through
+   the Keychain, so the app's encryption is "limited to that within the Apple
+   operating system", which Apple exempts from documentation in every country,
+   France included. If you add a library that brings its own cryptography or
+   makes HTTPS calls with Dart's `HttpClient` on iOS, revisit this.
+   `integration_test/auth_network_test.dart` checks the URLSession path on a
+   device.
 
 ### Android
 
-Release signing reads `android/key.properties` (git-ignored):
-
-```
-storePassword=...
-keyPassword=...
-keyAlias=upload
-storeFile=/absolute/path/to/upload-keystore.jks
-```
+Release signing reads `android/key.properties` (git-ignored). Copy
+`android/key.properties.example`, which also has the `keytool` command for
+creating an upload keystore. Enroll the app in Play App Signing; Google keeps
+the app signing key and you upload with this key.
 
 Without it, APKs are signed with the debug key (fine for your own phone) and
-the script refuses to build an App Bundle.
+the script refuses to build an App Bundle. The app targets API 36 and needs
+Android 8.0 (API 26) or later.
 
 Bump `version:` in `pubspec.yaml` for each release.
 
@@ -230,13 +239,16 @@ crash reporting, privacy manifest, no sample data or fake payments outside
 demo builds. Still needed, see [docs/backend-api.md](docs/backend-api.md):
 
 - The server's sign-in and account-deletion endpoints.
-- Server-owned points, rewards and transactions (now kept on the device), and
-  a signed, scannable member QR code (now drawn, not scannable).
+- Server-owned points, rewards and transactions (now kept on the device). The
+  member pass already shows a real, scannable QR code and Code 128 barcode of
+  the member number (`test/codes_scan_test.dart` decodes them); a rotating,
+  server-signed code would stop screenshots being reused.
 - Order Ahead orders reaching stores, card and Apple Pay payments, and wallet
   passes.
 - Real stores, menu, offers, fuel prices and hours (`lib/data/catalog.dart` is
   sample content with fictional 555 phone numbers).
 - The store map (a drawn illustration; a maps SDK would replace it) and push
   notifications.
-- Real Privacy Policy and Terms URLs (Account → Privacy & terms currently opens
-  the home page).
+- Published Privacy Policy and Terms of use pages. centermarkets.com has
+  neither yet; until the build sets `CM_PRIVACY_URL` and `CM_TERMS_URL`, the
+  app shows no legal links rather than a wrong page.

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../core/config.dart';
 import '../core/format.dart';
 import '../core/responsive.dart';
 import '../core/theme.dart';
@@ -325,15 +326,19 @@ class AccountScreen extends StatelessWidget {
                       applicationIcon: const Padding(padding: EdgeInsets.all(12), child: CMLogo(height: 48)),
                     ),
                   ),
-                  ListRow(
-                    icon: CMGlyph.shield,
-                    title: 'Privacy & terms',
-                    onTap: () => launchExternal(
-                      context,
-                      Uri.parse('https://www.centermarkets.com/'),
-                      'Could not open the website.',
+                  // Only real, published pages; never a stand-in.
+                  if (AppConfig.privacyPolicyUrl case final url?)
+                    ListRow(
+                      icon: CMGlyph.shield,
+                      title: 'Privacy policy',
+                      onTap: () => launchExternal(context, url, 'Could not open the privacy policy.'),
                     ),
-                  ),
+                  if (AppConfig.termsUrl case final url?)
+                    ListRow(
+                      icon: CMGlyph.receipt,
+                      title: 'Terms of use',
+                      onTap: () => launchExternal(context, url, 'Could not open the terms of use.'),
+                    ),
                 ],
               ),
             ),

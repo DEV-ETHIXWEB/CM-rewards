@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/config.dart';
 import '../core/format.dart';
 import '../core/responsive.dart';
 import '../core/theme.dart';
@@ -273,13 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
           const SizedBox(height: 6),
-          Center(
-            child: Text(
-              'By continuing you agree to the CM Rewards Terms and Privacy Policy.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: c.hint),
-            ),
-          ),
+          Center(child: _legalNote(c)),
           SizedBox(height: MediaQuery.paddingOf(context).bottom),
         ],
       ),
@@ -362,6 +357,47 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // Demo-only stand-ins. A real build uses each provider's official sign-in
   // button, since their logos are trademarks we don't redraw.
+  /// "By continuing you agree to the Terms and Privacy Policy", each a link
+  /// to the published page when the build has one.
+  Widget _legalNote(CMColors c) {
+    final style = TextStyle(fontSize: 12, color: c.hint, height: 1.5);
+    InlineSpan link(String label, Uri? url) {
+      if (url == null) return TextSpan(text: label);
+      return WidgetSpan(
+        alignment: PlaceholderAlignment.baseline,
+        baseline: TextBaseline.alphabetic,
+        child: Semantics(
+          link: true,
+          child: GestureDetector(
+            onTap: () => launchExternal(context, url, 'Could not open the $label.'),
+            child: Text(
+              label,
+              style: style.copyWith(
+                color: c.primaryInk,
+                fontWeight: FontWeight.w700,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          const TextSpan(text: 'By continuing you agree to the CM Rewards '),
+          link('Terms', AppConfig.termsUrl),
+          const TextSpan(text: ' and '),
+          link('Privacy Policy', AppConfig.privacyPolicyUrl),
+          const TextSpan(text: '.'),
+        ],
+      ),
+      textAlign: TextAlign.center,
+      style: style,
+    );
+  }
+
   Widget _socialButton(CMColors c, String provider) {
     return SizedBox(
       height: 52,

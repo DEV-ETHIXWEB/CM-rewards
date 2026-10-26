@@ -292,6 +292,29 @@ void main() {
     });
   }
 
+  for (final dsn in ['not a dsn', 'https://abc@o0.ingest.sentry.invalid/1']) {
+    testWidgets('the app still starts once with Sentry DSN "$dsn"', (tester) async {
+      final onError = FlutterError.onError;
+      final platformOnError = tester.binding.platformDispatcher.onError;
+      final builder = ErrorWidget.builder;
+      addTearDown(() async {
+        await Sentry.close();
+        FlutterError.onError = onError;
+        tester.binding.platformDispatcher.onError = platformOnError;
+        ErrorWidget.builder = builder;
+      });
+      var starts = 0;
+      await tester.runAsync(() => ErrorReporting.run(() => starts++, dsn: dsn));
+      expect(starts, 1);
+    });
+  }
+
+  test('legal links must be published HTTPS pages', () {
+    expect(AppConfig.parseLegalUrl(''), isNull);
+    expect(AppConfig.parseLegalUrl('http://example.com/privacy'), isNull);
+    expect(AppConfig.parseLegalUrl('https://example.com/privacy').toString(), 'https://example.com/privacy');
+  });
+
   test('crash reports carry no member details', () {
     final event = SentryEvent(
       user: SentryUser(id: 'member', ipAddress: '1.2.3.4'),
