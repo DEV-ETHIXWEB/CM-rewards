@@ -71,12 +71,15 @@ class AvatarFace extends StatelessWidget {
           color: color,
           border: Border.all(color: context.cm.background, width: size * 0.04),
         ),
-        child: emoji.isEmpty
-            ? Text(
+        child: emoji.isNotEmpty
+            ? Text(emoji, style: TextStyle(fontSize: size * 0.48))
+            // No name yet: a person glyph rather than an empty circle.
+            : initials.isEmpty
+            ? CMIcon(CMGlyph.person, color: Brand.white, size: size * 0.46)
+            : Text(
                 initials,
                 style: TextStyle(color: Brand.white, fontWeight: FontWeight.w800, fontSize: size * 0.34),
-              )
-            : Text(emoji, style: TextStyle(fontSize: size * 0.48)),
+              ),
       ),
     );
   }

@@ -734,15 +734,15 @@ Future<void> showCheckoutSheet(BuildContext context) {
             const SizedBox(height: 10),
             ListGroup(
               children: [
-                for (final method in paymentMethods)
+                for (final method in state.availablePaymentMethods)
                   ListRow(
                     icon: method.icon,
                     title: method.label,
                     subtitle: method.detail,
                     onTap: () => state.setDefaultPayment(method.id),
                     trailing: CMIcon(
-                      state.defaultPayment == method.id ? CMGlyph.radioOn : CMGlyph.radioOff,
-                      color: state.defaultPayment == method.id ? c.primaryInk : c.hint,
+                      state.payment.id == method.id ? CMGlyph.radioOn : CMGlyph.radioOff,
+                      color: state.payment.id == method.id ? c.primaryInk : c.hint,
                     ),
                   ),
               ],
@@ -761,20 +761,46 @@ Future<void> showCheckoutSheet(BuildContext context) {
             Divider(height: 26, color: c.line),
             _line(c, 'Total', formatMoney(subtotal + tax), bold: true),
             const SizedBox(height: 20),
+            // Never take an order no store will receive.
+            if (!state.canPlaceOrders) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: c.surfaceAlt, borderRadius: BorderRadius.circular(Radii.md)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CMIcon(CMGlyph.info, size: 20, color: c.muted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Ordering in the app isn’t connected to our stores yet. Order at the counter and '
+                        'show your member pass to earn points.',
+                        style: TextStyle(color: c.muted, fontSize: 13.5, height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
             PrimaryButton(
-              label: 'Place order',
-              trailing: Text(formatMoney(subtotal + tax), style: const TextStyle(fontFeatures: AppText.tabular)),
-              onPressed: () {
-                final method = paymentMethods.firstWhere((m) => m.id == state.defaultPayment);
-                final order = state.placeOrder(
-                  storeNumber: store.number,
-                  pickupMinutes: pickupOptions[pickup].$1,
-                  payment: method.label,
-                );
-                state.haptic(strong: true);
-                Navigator.of(context).pop();
-                fireAndForget(push<void>(context, OrderTrackerScreen(order: order, celebrate: true)));
-              },
+              label: state.canPlaceOrders ? 'Place order' : 'Order Ahead opens soon',
+              trailing: state.canPlaceOrders
+                  ? Text(formatMoney(subtotal + tax), style: const TextStyle(fontFeatures: AppText.tabular))
+                  : null,
+              onPressed: !state.canPlaceOrders
+                  ? null
+                  : () {
+                      final method = state.payment;
+                      final order = state.placeOrder(
+                        storeNumber: store.number,
+                        pickupMinutes: pickupOptions[pickup].$1,
+                        payment: method.label,
+                      );
+                      state.haptic(strong: true);
+                      Navigator.of(context).pop();
+                      fireAndForget(push<void>(context, OrderTrackerScreen(order: order, celebrate: true)));
+                    },
             ),
           ],
         );
@@ -936,7 +962,7 @@ class OrderTrackerScreen extends StatelessWidget {
                               child: SizedBox(
                                 width: 130,
                                 height: 130,
-                                child: CustomPaint(painter: QrPainter(seed: order.number * 7919)),
+                                child: CustomPaint(painter: QrPainter(data: 'CM-ORDER-${order.number}')),
                               ),
                             ),
                             const SizedBox(height: 12),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../core/config.dart';
 import '../core/format.dart';
 import '../core/responsive.dart';
 import '../core/theme.dart';
@@ -186,7 +185,10 @@ class _MemberPassScreenState extends State<MemberPassScreen> {
                   final seconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
                   final window = seconds ~/ _rotation;
                   final left = _rotation - seconds % _rotation;
-                  final seed = int.parse(state.phoneDigits.padLeft(10, '0')) ^ window;
+                  // The member number, which a register can scan or a cashier can type.
+                  // A rotating, signed code needs the server, so only the demo rotates.
+                  final member = state.memberId.replaceAll(' ', '');
+                  final payload = state.isDemo ? '$member-$window' : member;
                   return Column(
                     children: [
                       Padding(
@@ -209,7 +211,7 @@ class _MemberPassScreenState extends State<MemberPassScreen> {
                                       SizedBox(
                                         height: 120,
                                         width: double.infinity,
-                                        child: CustomPaint(painter: BarcodePainter('${state.phoneDigits}$window')),
+                                        child: CustomPaint(painter: BarcodePainter(payload)),
                                       ),
                                     ],
                                   ),
@@ -222,7 +224,7 @@ class _MemberPassScreenState extends State<MemberPassScreen> {
                                     alignment: Alignment.center,
                                     children: [
                                       Positioned.fill(
-                                        child: CustomPaint(painter: QrPainter(seed: seed)),
+                                        child: CustomPaint(painter: QrPainter(data: payload)),
                                       ),
                                       Container(
                                         width: 54,
@@ -265,33 +267,34 @@ class _MemberPassScreenState extends State<MemberPassScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              value: left / _rotation,
-                              strokeWidth: 2.2,
-                              color: Brand.green,
-                              backgroundColor: Brand.ink.withValues(alpha: 0.08),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              'Secure code refreshes in 0:${left.toString().padLeft(2, '0')}',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Brand.ink.withValues(alpha: 0.55),
-                                fontSize: 12.5,
-                                fontFeatures: AppText.tabular,
+                      if (state.isDemo)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                value: left / _rotation,
+                                strokeWidth: 2.2,
+                                color: Brand.green,
+                                backgroundColor: Brand.ink.withValues(alpha: 0.08),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Secure code refreshes in 0:${left.toString().padLeft(2, '0')}',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Brand.ink.withValues(alpha: 0.55),
+                                  fontSize: 12.5,
+                                  fontFeatures: AppText.tabular,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   );
                 },
@@ -321,15 +324,20 @@ class _MemberPassScreenState extends State<MemberPassScreen> {
         else
           _onDarkRow(CMGlyph.sun, 'Turn up your brightness', 'It helps the scanner read your code faster.'),
         const SizedBox(height: 18),
-        PrimaryButton(
-          label: Theme.of(context).platform == TargetPlatform.iOS ? 'Add to Apple Wallet' : 'Add to Google Wallet',
-          icon: CMGlyph.wallet,
-          tone: ButtonTone.dark,
-          height: 54,
-          onPressed: () => showToast(context, 'Pass added to your wallet', icon: CMGlyph.wallet),
-        ),
-        const SizedBox(height: 6),
-        if (AppConfig.demo)
+        // A real wallet pass is signed by the server (see docs/backend-api.md),
+        // so only the demo shows the button.
+        if (RewardsScope.of(context).isDemo) ...[
+          PrimaryButton(
+            label: Theme.of(context).platform == TargetPlatform.iOS ? 'Add to Apple Wallet' : 'Add to Google Wallet',
+            icon: CMGlyph.wallet,
+            tone: ButtonTone.dark,
+            height: 54,
+            onPressed: () =>
+                showToast(context, 'Demo: real passes come from the CM Rewards server', icon: CMGlyph.wallet),
+          ),
+          const SizedBox(height: 6),
+        ],
+        if (RewardsScope.of(context).isDemo)
           TextButton.icon(
             onPressed: _scanning ? null : _simulateScan,
             style: TextButton.styleFrom(foregroundColor: Brand.white.withValues(alpha: 0.85)),

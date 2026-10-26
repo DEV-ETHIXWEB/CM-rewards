@@ -13,9 +13,19 @@ flutter run                 # pick a simulator or device
 
 Tap **Explore in Demo Mode** on the sign-in screen to skip the phone number
 step. In the demo, any 6-digit code works (`000000` shows the wrong-code
-error), and the member pass has a "simulate a scan" button. Demo shortcuts are
-on in debug builds and off in release builds unless built with
-`--dart-define=CM_DEMO=true`.
+error), and the member pass has a "simulate a scan" button.
+
+The app runs in one of three modes, decided at build time:
+
+| Build | Sign-in | Member data |
+| --- | --- | --- |
+| Debug, or `--dart-define=CM_DEMO=true` | Simulated codes | Sample member "Akash" |
+| `--dart-define=CM_API_URL=https://...` | Real texts through the server ([docs/backend-api.md](docs/backend-api.md)) | Starts blank |
+| Release with neither | Refused: "Sign-in isn't available yet" | Starts blank |
+
+To try the real sign-in against a local server:
+`flutter run --dart-define=CM_API_URL=http://127.0.0.1:8080` (plain HTTP is
+allowed only for this machine).
 
 ## Points economy
 
@@ -90,7 +100,7 @@ State lives in one `RewardsState`, reached through `RewardsScope.of(context)`
   (`Breakpoints.maxTextScale`). Fixed-height carousels grow with the text
   through `context.textHeight(...)`.
 - Light and dark mode, with a System / Light / Dark switch in Account.
-- iOS 15+ (iPhone and iPad). Android follows Flutter's default `minSdk`, with
+- iOS 15+ (iPhone and iPad). Android 8.0+ (API 26, required by Sentry), with
   edge-to-edge and predictive back enabled.
 
 ## Tests
@@ -99,6 +109,7 @@ State lives in one `RewardsState`, reached through `RewardsScope.of(context)`
 flutter test                                       # everything below
 flutter test test/device_matrix_test.dart          # layout on 10 devices
 flutter test integration_test -d <simulator-id> --dart-define=TOUR_THEME=dark   # every screen, for screenshots
+flutter test integration_test/auth_network_test.dart -d <device-id>          # sign-in over the platform's HTTPS stack
 ```
 
 - `widget_test.dart`: the main flows (sign-in, scanning, redeeming, Order
@@ -110,6 +121,9 @@ flutter test integration_test -d <simulator-id> --dart-define=TOUR_THEME=dark   
 - `migration_test.dart`: data saved by older versions still loads, and saved
   state (wallet, orders, settings) round-trips.
 - `regression_test.dart`: bugs found in QA, kept fixed.
+- `auth_test.dart`: the server sign-in client, and real-build behavior: no
+  server means no sign-in, real members start blank, deletion waits for the
+  server, crash reports carry no member details.
 
 **When you add a screen**, add it to the tour in `device_matrix_test.dart`.
 
@@ -139,8 +153,13 @@ What the app does on the device:
   device transfer (`allowBackup=false`, `data_extraction_rules.xml`).
 - No plain HTTP (`usesCleartextTraffic=false`; iOS App Transport Security on).
 - Release builds are obfuscated (`scripts/build_release.sh`).
-- Sign-in: real US number check, 5 wrong codes lock for 60 seconds, resends
-  capped at 3.
+- Sign-in fails closed: release builds verify codes with the server and
+  refuse sign-in when none is configured. Real US number check, 5 wrong codes
+  lock for 60 seconds, resends capped at 3. The session token lives in the
+  same encrypted store.
+- Crash reports (Sentry) carry no user, IP address, screenshot or view
+  hierarchy.
+- iOS network traffic uses Apple's URLSession and its TLS; Android uses Dart's.
 - Double-tap protection on every button, so nothing is redeemed or ordered
   twice.
 - Input validation and limits on names, emails and gifts (no gifting to
@@ -155,37 +174,81 @@ QR code, and make each reward code single-use.
 ## Release builds
 
 ```sh
-scripts/build_release.sh apk         # Android APK (DEMO=true to keep demo shortcuts)
-scripts/build_release.sh appbundle   # Google Play
-scripts/build_release.sh ipa         # App Store (needs an Apple Developer account)
+DEMO=true scripts/build_release.sh apk     # demo APK for sales and testing
+
+export CM_API_URL=https://<your server>
+export CM_PRIVACY_URL=https://<published privacy policy>
+export CM_TERMS_URL=https://<published terms of use>
+scripts/build_release.sh appbundle         # Google Play
+scripts/build_release.sh ipa               # App Store
 ```
 
-Android release signing reads `android/key.properties` (git-ignored):
+The script runs the analyzer and tests first, then builds obfuscated, with
+symbols in `build/symbols` and the obfuscation map in
+`build/app/obfuscation.map.json` (keep both; never ship them). Non-demo
+builds are refused without HTTPS `CM_API_URL`, `CM_PRIVACY_URL` and
+`CM_TERMS_URL`: there's no sign-in without the server, and both stores
+require a privacy policy for apps with accounts. Optional:
 
-```
-storePassword=...
-keyPassword=...
-keyAlias=upload
-storeFile=/absolute/path/to/upload-keystore.jks
-```
+| Variable | Effect |
+| --- | --- |
+| `CM_SENTRY_DSN` | Turns on crash reporting (Sentry). A bad DSN never stops the app from starting. |
+| `CM_ENV` | Crash report environment; defaults to `production` (or `demo`). |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | After the build, `sentry_dart_plugin` uploads the debug symbols, dSYMs and obfuscation map so crash reports show real names (settings: `sentry:` in `pubspec.yaml`). |
 
-Without it, release builds are signed with the debug key, which is fine for
-testing on your own phone but not for Google Play.
+### iOS
+
+1. Open `ios/Runner.xcworkspace` in Xcode, select the Runner target, and under
+   Signing & Capabilities pick your team (bundle ID
+   `com.centermarkets.centerMarketsRewards`; change it there if you use another).
+2. Create the app in App Store Connect with the same bundle ID.
+3. `CM_API_URL=... CM_SENTRY_DSN=... scripts/build_release.sh ipa`, then
+   upload `build/ios/ipa/*.ipa` with Transporter or `xcrun altool`.
+4. In App Store Connect, App Privacy: answer to match
+   `ios/Runner/PrivacyInfo.xcprivacy`: Phone Number (linked, app
+   functionality) and Crash Data and Other Diagnostic Data (not linked, app
+   functionality, only if Sentry is on). No tracking.
+5. Export compliance is declared in `ios/Runner/Info.plist`
+   (`ITSAppUsesNonExemptEncryption` = `NO`): on iOS every encrypted
+   connection goes through Apple's URLSession (the server client through
+   `cupertino_http`, Sentry through its native SDK) and member data through
+   the Keychain, so the app's encryption is "limited to that within the Apple
+   operating system", which Apple exempts from documentation in every country,
+   France included. If you add a library that brings its own cryptography or
+   makes HTTPS calls with Dart's `HttpClient` on iOS, revisit this.
+   `integration_test/auth_network_test.dart` checks the URLSession path on a
+   device.
+
+### Android
+
+Release signing reads `android/key.properties` (git-ignored). Copy
+`android/key.properties.example`, which also has the `keytool` command for
+creating an upload keystore. Enroll the app in Play App Signing; Google keeps
+the app signing key and you upload with this key.
+
+Without it, APKs are signed with the debug key (fine for your own phone) and
+the script refuses to build an App Bundle. The app targets API 36 and needs
+Android 8.0 (API 26) or later.
+
+Bump `version:` in `pubspec.yaml` for each release.
 
 ## Before going live
 
-The app is fully interactive, but these parts are simulated and need a backend:
+Done in the app: real sign-in client, account deletion through the server,
+crash reporting, privacy manifest, no sample data or fake payments outside
+demo builds. Still needed, see [docs/backend-api.md](docs/backend-api.md):
 
-- Phone sign-in (OTP), Apple and Google sign-in
-- Points, rewards and transactions (now kept on the device)
-- Order Ahead payments and order status
-- Fuel prices, store hours and busy times
-- The member QR code and barcode (drawn, not scannable)
-- The store map (a drawn illustration; a maps SDK would replace it)
-- Push notifications
-- Crash reporting: hook Sentry or Crashlytics into `ErrorReporting.report`
-- Real Privacy Policy and Terms URLs (Account → Privacy & terms)
-
-Also set a real release signing config in `android/app/build.gradle.kts`, and
-bump `version:` in `pubspec.yaml` for each release (Account reads it from
-the platform).
+- The server's sign-in and account-deletion endpoints.
+- Server-owned points, rewards and transactions (now kept on the device). The
+  member pass already shows a real, scannable QR code and Code 128 barcode of
+  the member number (`test/codes_scan_test.dart` decodes them); a rotating,
+  server-signed code would stop screenshots being reused.
+- Order Ahead orders reaching stores, card and Apple Pay payments, and wallet
+  passes.
+- Real stores, menu, offers, fuel prices and hours (`lib/data/catalog.dart` is
+  sample content with fictional 555 phone numbers).
+- The store map (a drawn illustration; a maps SDK would replace it) and push
+  notifications.
+- Published Privacy Policy and Terms of use pages. centermarkets.com has
+  neither yet; until the build sets `CM_PRIVACY_URL` and `CM_TERMS_URL`, the
+  app shows no legal links rather than a wrong page.

@@ -1,0 +1,11 @@
+# Google Play upload key. Copy to android/key.properties (git-ignored) and
+# fill in. Never commit the real file or the keystore.
+#
+# Create an upload keystore once, then keep it and its passwords somewhere
+# safe (a password manager); Google Play App Signing holds the app signing key:
+#   keytool -genkeypair -v -keystore ~/keys/cm-rewards-upload.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+storePassword=
+keyPassword=
+keyAlias=upload
+storeFile=/absolute/path/to/cm-rewards-upload.jks

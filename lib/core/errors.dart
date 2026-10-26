@@ -1,31 +1,87 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
+import 'config.dart';
 import 'theme.dart';
 
-/// Routes every uncaught error to one place. Hook a crash reporter (Sentry,
-/// Crashlytics) into [report] before launch.
+/// Routes every error to one place: the debug console during development and
+/// Sentry in builds made with `--dart-define=CM_SENTRY_DSN=...`.
 class ErrorReporting {
   ErrorReporting._();
 
-  static void install() {
-    FlutterError.onError = (details) {
-      FlutterError.presentError(details);
-      report(details.exception, details.stack);
-    };
+  /// Whether crash reports leave the device in this build.
+  static bool get enabled => AppConfig.sentryDsn.isNotEmpty;
+
+  /// Installs the handlers, starts Sentry when configured, then runs the app.
+  /// Sentry captures uncaught errors itself and then calls these handlers, so
+  /// they only log; otherwise every crash would be reported twice.
+  static Future<void> run(FutureOr<void> Function() app, {@visibleForTesting String? dsn}) async {
+    final key = dsn ?? AppConfig.sentryDsn;
+    FlutterError.onError = FlutterError.presentError;
     PlatformDispatcher.instance.onError = (error, stack) {
-      report(error, stack);
+      _log(error);
       return true;
     };
     if (kReleaseMode) ErrorWidget.builder = (details) => const _FriendlyError();
+    if (key.isEmpty) return app();
+    // A bad DSN or a native SDK failure must never keep the app from opening:
+    // if Sentry fails before the app starts, start it without crash reports.
+    var started = false;
+    try {
+      await SentryFlutter.init(
+        (options) {
+          configure(options);
+          options.dsn = key;
+        },
+        appRunner: () {
+          started = true;
+          return app();
+        },
+      );
+    } catch (error) {
+      _log(error);
+      if (!started) await app();
+    }
   }
 
+  @visibleForTesting
+  static void configure(SentryFlutterOptions options) {
+    options
+      ..dsn = AppConfig.sentryDsn
+      ..environment = AppConfig.environment
+      // No IP addresses, cookies or user details; no screenshots or view
+      // trees, which could show a member's phone number or points.
+      ..sendDefaultPii = false
+      ..attachScreenshot = false
+      ..attachViewHierarchy = false
+      // Crashes only: no performance tracing.
+      ..tracesSampleRate = null
+      ..beforeSend = scrub;
+  }
+
+  /// Drops anything that identifies the member before a report is sent.
+  @visibleForTesting
+  static SentryEvent scrub(SentryEvent event, Hint hint) {
+    event
+      ..user = null
+      ..serverName = null;
+    return event;
+  }
+
+  /// For errors the app handles itself but still wants to hear about.
   static void report(Object error, StackTrace? stack) {
-    // Release builds don't write errors to the device log, where other
-    // tools could read them. Send them to a crash reporter here instead.
+    _log(error);
+    if (enabled) unawaited(Sentry.captureException(error, stackTrace: stack));
+  }
+
+  // Release builds don't write errors to the device log, where other tools
+  // could read them.
+  static void _log(Object error) {
     if (!kReleaseMode) debugPrint('CM Rewards error: $error');
   }
 }

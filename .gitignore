@@ -68,3 +68,6 @@ google-services.json
 /assets/images/*
 !/assets/images/logo.png
 /.backup/
+
+# Built release artifacts
+/dist/

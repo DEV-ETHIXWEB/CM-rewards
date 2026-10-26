@@ -83,10 +83,10 @@ class HomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${_greeting()},',
+            state.firstName.isEmpty ? _greeting() : '${_greeting()},',
             style: TextStyle(fontSize: 15, color: c.muted, fontWeight: FontWeight.w600),
           ),
-          Text(state.firstName, style: AppText.display),
+          Text(state.firstName.isEmpty ? 'Welcome' : state.firstName, style: AppText.display),
         ],
       ),
     );
@@ -1000,7 +1000,8 @@ class ChallengeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.cm;
-    final progress = challenge.progress / challenge.goal;
+    final done = RewardsScope.of(context).challengeProgress(challenge);
+    final progress = done / challenge.goal;
     return Container(
       width: 236,
       padding: const EdgeInsets.all(16),
@@ -1031,7 +1032,7 @@ class ChallengeCard extends StatelessWidget {
           ProgressBar(value: progress, height: 7),
           const SizedBox(height: 8),
           Text(
-            '${challenge.prefix}${challenge.progress} of ${challenge.prefix}${challenge.goal}  ·  ${challenge.endsIn}',
+            '${challenge.prefix}$done of ${challenge.prefix}${challenge.goal}  ·  ${challenge.endsIn}',
             style: TextStyle(fontSize: 12, color: c.muted, fontFeatures: AppText.tabular),
           ),
         ],

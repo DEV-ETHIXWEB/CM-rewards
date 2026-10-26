@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../core/config.dart';
 import '../core/format.dart';
 import '../core/responsive.dart';
 import '../core/theme.dart';
+import '../data/auth_api.dart';
 import '../data/catalog.dart';
 import '../data/models.dart';
 import '../state/rewards_state.dart';
@@ -47,7 +49,20 @@ class AccountScreen extends StatelessWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    RewardsScope.read(context).signOut();
+    final state = RewardsScope.read(context);
+    if (delete) {
+      try {
+        await state.deleteAccount();
+      } on AuthException catch (e) {
+        if (!context.mounted) return;
+        // The account stays until the server confirms it's gone.
+        showToast(context, authFailureMessage(e, deleting: true), icon: CMGlyph.info);
+        return;
+      }
+    } else {
+      fireAndForget(state.signOut());
+    }
+    if (!context.mounted) return;
     fireAndForget(Navigator.of(context).pushAndRemoveUntil(fadeRoute<void>(const LoginScreen()), (route) => false));
   }
 
@@ -129,7 +144,7 @@ class AccountScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(state.name, style: AppText.headline),
+                                Text(state.name.isEmpty ? 'CM Rewards member' : state.name, style: AppText.headline),
                                 const SizedBox(height: 2),
                                 Text(
                                   '+1 ${state.phone} · Member since ${months[since.month - 1]} ${since.year}',
@@ -214,7 +229,9 @@ class AccountScreen extends StatelessWidget {
                   ListRow(
                     icon: CMGlyph.idCard,
                     title: 'Personal info',
-                    subtitle: [state.name, if (state.email.isNotEmpty) state.email].join(' · '),
+                    subtitle: state.name.isEmpty
+                        ? 'Add your name'
+                        : [state.name, if (state.email.isNotEmpty) state.email].join(' · '),
                     onTap: () => showEditProfileSheet(context),
                   ),
                   ListRow(
@@ -226,7 +243,7 @@ class AccountScreen extends StatelessWidget {
                   ListRow(
                     icon: CMGlyph.card,
                     title: 'Payment methods',
-                    subtitle: paymentMethods.firstWhere((m) => m.id == state.defaultPayment).label,
+                    subtitle: state.payment.label,
                     onTap: () => showPaymentsSheet(context),
                   ),
                   ListRow(
@@ -309,15 +326,19 @@ class AccountScreen extends StatelessWidget {
                       applicationIcon: const Padding(padding: EdgeInsets.all(12), child: CMLogo(height: 48)),
                     ),
                   ),
-                  ListRow(
-                    icon: CMGlyph.shield,
-                    title: 'Privacy & terms',
-                    onTap: () => launchExternal(
-                      context,
-                      Uri.parse('https://www.centermarkets.com/'),
-                      'Could not open the website.',
+                  // Only real, published pages; never a stand-in.
+                  if (AppConfig.privacyPolicyUrl case final url?)
+                    ListRow(
+                      icon: CMGlyph.shield,
+                      title: 'Privacy policy',
+                      onTap: () => launchExternal(context, url, 'Could not open the privacy policy.'),
                     ),
-                  ),
+                  if (AppConfig.termsUrl case final url?)
+                    ListRow(
+                      icon: CMGlyph.receipt,
+                      title: 'Terms of use',
+                      onTap: () => launchExternal(context, url, 'Could not open the terms of use.'),
+                    ),
                 ],
               ),
             ),
@@ -585,23 +606,17 @@ Future<void> showPaymentsSheet(BuildContext context) {
         const SizedBox(height: 14),
         ListGroup(
           children: [
-            for (final m in paymentMethods)
+            for (final m in state.availablePaymentMethods)
               ListRow(
                 icon: m.icon,
                 title: m.label,
                 subtitle: m.detail,
                 onTap: () => state.setDefaultPayment(m.id),
-                trailing: state.defaultPayment == m.id
+                trailing: state.payment.id == m.id
                     ? const StatusPill(label: 'Default', positive: true, dot: false)
                     : null,
               ),
           ],
-        ),
-        const SizedBox(height: 14),
-        SecondaryButton(
-          label: 'Add a card',
-          icon: CMGlyph.card,
-          onPressed: () => showToast(context, 'Card scanning is coming soon', icon: CMGlyph.card),
         ),
       ],
     );

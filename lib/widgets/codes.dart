@@ -1,39 +1,44 @@
 import 'dart:math';
 
+import 'package:barcode/barcode.dart';
 import 'package:flutter/material.dart';
+import 'package:qr/qr.dart';
 
 import '../core/theme.dart';
 
-/// A QR-style member code. Not scannable: the demo has no backend to verify it.
+/// A scannable QR code (ISO/IEC 18004), drawn in the brand style: round
+/// modules and rounded finder rings. High error correction leaves room for
+/// the CM badge laid over the middle.
 class QrPainter extends CustomPainter {
-  QrPainter({required this.seed, this.color = Brand.ink, this.accent = Brand.burgundy});
+  QrPainter({required this.data, this.color = Brand.ink, this.accent = Brand.burgundy})
+    : _image = QrImage(QrCode.fromData(data: data, errorCorrectLevel: QrErrorCorrectLevel.H));
 
-  final int seed;
+  final String data;
   final Color color;
   final Color accent;
+  final QrImage _image;
 
-  static const _modules = 25;
+  int get moduleCount => _image.moduleCount;
 
-  bool _reserved(int x, int y) {
-    final finder = (x < 8 && y < 8) || (x >= _modules - 8 && y < 8) || (x < 8 && y >= _modules - 8);
-    final center = (x - _modules ~/ 2).abs() <= 3 && (y - _modules ~/ 2).abs() <= 3;
-    return finder || center;
+  bool _inFinder(int x, int y) {
+    final n = _image.moduleCount;
+    return (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final cell = size.width / _modules;
+    final n = _image.moduleCount;
+    final cell = size.shortestSide / n;
     final dark = Paint()..color = color;
-    final rng = Random(seed);
-
-    for (var y = 0; y < _modules; y++) {
-      for (var x = 0; x < _modules; x++) {
-        if (!_reserved(x, y) && rng.nextBool()) {
-          canvas.drawCircle(Offset((x + 0.5) * cell, (y + 0.5) * cell), cell * 0.44, dark);
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        if (!_inFinder(x, y) && _image.isDark(y, x)) {
+          canvas.drawCircle(Offset((x + 0.5) * cell, (y + 0.5) * cell), cell * 0.46, dark);
         }
       }
     }
 
+    // Each finder: a 7-module ring around a 3-module square, as the standard requires.
     void finder(int col, int row) {
       final origin = Offset(col * cell, row * cell);
       final ring = Paint()
@@ -44,7 +49,7 @@ class QrPainter extends CustomPainter {
         ..drawRRect(
           RRect.fromRectAndRadius(
             (origin + Offset(cell / 2, cell / 2)) & Size.square(cell * 6),
-            Radius.circular(cell * 1.8),
+            Radius.circular(cell * 1.6),
           ),
           ring,
         )
@@ -55,37 +60,29 @@ class QrPainter extends CustomPainter {
     }
 
     finder(0, 0);
-    finder(_modules - 7, 0);
-    finder(0, _modules - 7);
+    finder(n - 7, 0);
+    finder(0, n - 7);
   }
 
   @override
   bool shouldRepaint(covariant QrPainter oldDelegate) =>
-      oldDelegate.seed != seed || oldDelegate.color != color || oldDelegate.accent != accent;
+      oldDelegate.data != data || oldDelegate.color != color || oldDelegate.accent != accent;
 }
 
+/// A scannable Code 128 barcode, which every register scanner reads.
 class BarcodePainter extends CustomPainter {
   BarcodePainter(this.data, {this.color = Brand.ink});
 
   final String data;
   final Color color;
 
+  static final _code128 = Barcode.code128();
+
   @override
   void paint(Canvas canvas, Size size) {
-    final rng = Random(data.codeUnits.fold<int>(7, (hash, c) => (hash * 31 + c) & 0x7fffffff));
-    final widths = <int>[];
-    var total = 0;
-    while (total < 110) {
-      final w = 1 + rng.nextInt(3);
-      widths.add(w);
-      total += w;
-    }
-    final unit = size.width / total;
     final paint = Paint()..color = color;
-    var x = 0.0;
-    for (var i = 0; i < widths.length; i++) {
-      if (i.isEven) canvas.drawRect(Rect.fromLTWH(x, 0, widths[i] * unit, size.height), paint);
-      x += widths[i] * unit;
+    for (final bar in _code128.make(data, width: size.width, height: size.height).whereType<BarcodeBar>()) {
+      if (bar.black) canvas.drawRect(Rect.fromLTWH(bar.left, bar.top, bar.width, bar.height), paint);
     }
   }
 
