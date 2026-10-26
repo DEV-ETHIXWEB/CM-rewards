@@ -147,7 +147,7 @@ class AccountScreen extends StatelessWidget {
                                 Text(state.name.isEmpty ? 'CM Rewards member' : state.name, style: AppText.headline),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '+1 ${state.phone} · Member since ${months[since.month - 1]} ${since.year}',
+                                  '${state.phoneDigits.isEmpty ? 'Demo account' : '+1 ${state.phone}'} · Member since ${months[since.month - 1]} ${since.year}',
                                   style: TextStyle(color: c.muted, fontSize: 13),
                                 ),
                               ],
@@ -309,12 +309,18 @@ class AccountScreen extends StatelessWidget {
                   ListRow(
                     icon: CMGlyph.chat,
                     title: 'Contact us',
-                    subtitle: 'We usually reply within a day',
-                    onTap: () => launchExternal(
-                      context,
-                      Uri(scheme: 'mailto', path: 'rewards@centermarkets.com', query: 'subject=CM Rewards help'),
-                      'No email app found on this device.',
-                    ),
+                    subtitle: state.isDemo ? 'Support email connects in the live app' : 'We usually reply within a day',
+                    onTap: () => state.isDemo
+                        ? showToast(
+                            context,
+                            'Demo: the live app emails Center Market support from here.',
+                            icon: CMGlyph.mail,
+                          )
+                        : launchExternal(
+                            context,
+                            Uri(scheme: 'mailto', path: 'rewards@centermarkets.com', query: 'subject=CM Rewards help'),
+                            'No email app found on this device.',
+                          ),
                   ),
                   ListRow(icon: CMGlyph.info, title: 'About Center Market', onTap: () => showAboutSheet(context)),
                   ListRow(
@@ -545,7 +551,10 @@ class _EditProfileFormState extends State<_EditProfileForm> {
                 CMIcon(CMGlyph.device, color: c.muted),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text('+1 ${_state.phone}', style: TextStyle(color: c.muted, fontSize: 16)),
+                  child: Text(
+                    _state.phoneDigits.isEmpty ? 'Demo account, no phone number' : '+1 ${_state.phone}',
+                    style: TextStyle(color: c.muted, fontSize: 16),
+                  ),
                 ),
                 CMIcon(CMGlyph.lock, size: 18, color: c.hint),
               ],
@@ -709,7 +718,12 @@ class _VersionLabel extends StatelessWidget {
       builder: (context, snapshot) {
         final info = snapshot.data;
         final version = info == null ? '' : ' ${info.version} (${info.buildNumber})';
-        return Text('CM Rewards$version · Made in Oregon', style: TextStyle(fontSize: 12, color: context.cm.hint));
+        final demo = RewardsScope.of(context).isDemo ? ' · Demo build, sample data' : '';
+        return Text(
+          'CM Rewards$version · Made in Oregon$demo',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: context.cm.hint),
+        );
       },
     );
   }

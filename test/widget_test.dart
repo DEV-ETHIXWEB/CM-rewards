@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:center_markets_rewards/data/catalog.dart';
 import 'package:center_markets_rewards/main.dart';
+import 'package:center_markets_rewards/screens/account.dart';
+import 'package:center_markets_rewards/screens/stores.dart';
 
 Future<RewardsState> launchToLogin(WidgetTester tester) async {
   // Reduced motion keeps looping animations from blocking pumpAndSettle.
@@ -180,5 +182,45 @@ void main() {
     expect(state.tier.label, 'Insider');
     // \$10 at 10 points per dollar, 1.5x for Insiders.
     expect(state.pointsFor(1000), 150);
+  });
+
+  testWidgets('the demo is labelled and shows no fictional phone numbers', (tester) async {
+    final state = await launchToLogin(tester);
+    expect(find.text('Mobile number'), findsOneWidget);
+    await enterDemo(tester);
+
+    expect(find.text('DEMO'), findsOneWidget);
+    expect(state.memberId, 'CM 4821 093 517');
+    expect(stores.every((s) => s.phone == null), isTrue);
+
+    tester
+        .state<NavigatorState>(find.byType(Navigator).first)
+        .push(MaterialPageRoute<void>(builder: (_) => const AccountScreen()))
+        .ignore();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Demo account'), findsOneWidget);
+    expect(find.textContaining('555'), findsNothing);
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -6000));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Demo build, sample data'), findsOneWidget);
+  });
+
+  testWidgets('stores: no Call buttons without a number, locate opens the map', (tester) async {
+    await launchToLogin(tester);
+    await enterDemo(tester);
+    await tester.tap(find.byKey(const ValueKey('nav-stores')));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Call'), findsNothing);
+    await tester.tap(find.byTooltip('Stores near me'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AreaMap), findsOneWidget);
+    // The nearest store is picked on the map.
+    expect(find.text(stores.reduce((a, b) => a.distance <= b.distance ? a : b).name), findsWidgets);
+
+    showStoreSheet(tester.element(find.byType(AreaMap)), stores[1]).ignore();
+    await tester.pumpAndSettle();
+    expect(find.text('Call'), findsNothing);
+    expect(find.text('Get Directions'), findsOneWidget);
   });
 }

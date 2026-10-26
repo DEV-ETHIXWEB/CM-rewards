@@ -19,9 +19,14 @@ The app runs in one of three modes, decided at build time:
 
 | Build | Sign-in | Member data |
 | --- | --- | --- |
-| Debug, or `--dart-define=CM_DEMO=true` | Simulated codes | Sample member "Akash" |
+| Debug, or `--dart-define=CM_DEMO=true` | Simulated codes | Sample member "Akash" (no phone number, member CM 4821 093 517) |
 | `--dart-define=CM_API_URL=https://...` | Real texts through the server ([docs/backend-api.md](docs/backend-api.md)) | Starts blank |
 | Release with neither | Refused: "Sign-in isn't available yet" | Starts blank |
+
+Demo builds say so: a DEMO tag on Home and "Demo build, sample data" at the
+foot of Account. The bundled stores are samples (`sampleCatalog` in
+`lib/data/catalog.dart`), so they list no phone numbers and Directions searches
+Maps for Center Market in the store's city rather than a street address.
 
 To try the real sign-in against a local server:
 `flutter run --dart-define=CM_API_URL=http://127.0.0.1:8080` (plain HTTP is

@@ -126,11 +126,16 @@ class RewardsState extends ChangeNotifier {
   // ─── Derived ────────────────────────────────────────────────────────────────
 
   String get phone => formatPhone(phoneDigits);
+
+  /// Member number for the demo account, which has no phone number.
+  static const demoMemberNumber = '4821093517';
   String get firstName => name.trim().split(RegExp(r'\s+')).first;
   String get initials =>
       name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase();
   String get memberId {
-    final d = phoneDigits.padLeft(10, '0');
+    // The demo member has no phone number; give them a member number that
+    // doesn't look like one.
+    final d = phoneDigits.isEmpty ? demoMemberNumber : phoneDigits.padLeft(10, '0');
     return 'CM ${d.substring(0, 4)} ${d.substring(4, 7)} ${d.substring(7)}';
   }
 
@@ -267,7 +272,7 @@ class RewardsState extends ChangeNotifier {
 
   void _applyDemoMember(DateTime Function(int days, int hour) ago) {
     name = 'Akash';
-    phoneDigits = '5551234567';
+    phoneDigits = '';
     memberSince = DateTime(2024, 3, 14);
     points = 2340;
     lifetimePoints = 4860;

@@ -171,7 +171,7 @@ class Store {
     required this.street,
     required this.address,
     required this.city,
-    required this.phone,
+    this.phone,
     required this.distance,
     required this.opens,
     required this.closes,
@@ -186,7 +186,9 @@ class Store {
   final String street;
   final String address;
   final String city;
-  final String phone;
+
+  /// Null when the store's number isn't known; the app then offers no Call button.
+  final String? phone;
   final double distance;
 
   /// Opening and closing hour (24h clock). `closes: 24` means midnight.

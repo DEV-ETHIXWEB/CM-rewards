@@ -134,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _demoMode() {
     RewardsScope.read(context)
       ..haptic()
-      ..signIn('5551234567', skipProfile: true);
+      ..signIn('', skipProfile: true);
     enterApp(context);
   }
 
@@ -336,7 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: InputDecoration(
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                hintText: '(555) 123-4567',
+                hintText: 'Mobile number',
                 hintStyle: TextStyle(color: c.hint),
               ),
             ),
@@ -406,7 +406,7 @@ class _LoginScreenState extends State<LoginScreen> {
         onPressed: () {
           RewardsScope.read(context)
             ..haptic()
-            ..signIn('5551234567');
+            ..signIn('');
           enterApp(context, personalize: true);
         },
         style: OutlinedButton.styleFrom(

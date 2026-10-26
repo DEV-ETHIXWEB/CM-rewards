@@ -144,13 +144,18 @@ const _commuter = [0, 0, 0, 0, 0, 1, 4, 7, 8, 5, 4, 5, 7, 6, 4, 5, 7, 9, 8, 6, 5
 const _lateNight = [3, 2, 2, 1, 1, 2, 4, 6, 6, 4, 4, 5, 6, 5, 5, 6, 8, 9, 9, 8, 7, 6, 5, 4];
 const _quiet = [0, 0, 0, 0, 0, 0, 2, 4, 5, 3, 3, 4, 5, 4, 3, 3, 5, 6, 5, 4, 3, 1, 0, 0];
 
+/// The stores, menu, offers and rewards below are sample content for demos.
+/// While this is true the app doesn't point at street addresses: Directions
+/// searches Maps for Center Market in the store's city instead. Set it to
+/// false when the real catalog replaces this one.
+const sampleCatalog = true;
+
 const stores = [
   Store(
     number: 1,
     street: 'Main St',
     address: '1420 Main St',
     city: 'Salem, OR 97301',
-    phone: '5035550141',
     distance: 0.8,
     opens: 6,
     closes: 23,
@@ -164,7 +169,6 @@ const stores = [
     street: 'Oak Ave',
     address: '2315 Oak Ave NE',
     city: 'Salem, OR 97301',
-    phone: '5035550172',
     distance: 1.4,
     opens: 5,
     closes: 24,
@@ -179,7 +183,6 @@ const stores = [
     street: 'Elm Blvd',
     address: '880 Elm Blvd',
     city: 'Keizer, OR 97303',
-    phone: '5035550118',
     distance: 2.3,
     opens: 0,
     closes: 24,
@@ -194,7 +197,6 @@ const stores = [
     street: 'River Rd',
     address: '4567 River Rd N',
     city: 'Keizer, OR 97303',
-    phone: '5035550190',
     distance: 3.1,
     opens: 6,
     closes: 22,
@@ -209,7 +211,6 @@ const stores = [
     street: 'Park Lane',
     address: '310 Park Ln SE',
     city: 'Salem, OR 97302',
-    phone: '5035550133',
     distance: 4.6,
     opens: 7,
     closes: 21,

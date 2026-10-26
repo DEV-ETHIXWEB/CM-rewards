@@ -60,6 +60,8 @@ class HomeScreen extends StatelessWidget {
         children: [
           // The side rail already shows the logo and account on wide screens.
           if (!rail) const CMLogo(height: 38),
+          // Demo builds say so up front: the member, points and offers are samples.
+          if (state.isDemo) ...[if (!rail) const SizedBox(width: 10), const _DemoTag()],
           const Spacer(),
           CircleIconButton(
             icon: CMGlyph.bell,
@@ -253,6 +255,32 @@ class HomeScreen extends StatelessWidget {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _DemoTag extends StatelessWidget {
+  const _DemoTag();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cm;
+    return Semantics(
+      label: 'Demo build with sample data',
+      child: ExcludeSemantics(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          decoration: BoxDecoration(
+            color: c.positiveSoft,
+            borderRadius: BorderRadius.circular(Radii.sm),
+            border: Border.all(color: c.positiveInk.withValues(alpha: 0.25)),
+          ),
+          child: Text(
+            'DEMO',
+            style: TextStyle(color: c.positiveInk, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2),
+          ),
         ),
       ),
     );

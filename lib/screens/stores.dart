@@ -14,7 +14,7 @@ import '../widgets/motion.dart';
 import '../widgets/cm_icons.dart';
 
 Future<void> openDirections(BuildContext context, Store store) {
-  final destination = Uri.encodeComponent(store.fullAddress);
+  final destination = Uri.encodeComponent(sampleCatalog ? 'Center Market, ${store.city}' : store.fullAddress);
   final uri = Theme.of(context).platform == TargetPlatform.iOS
       ? Uri.parse('https://maps.apple.com/?daddr=$destination')
       : Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$destination');
@@ -22,7 +22,9 @@ Future<void> openDirections(BuildContext context, Store store) {
 }
 
 Future<void> callStore(BuildContext context, Store store) {
-  return launchExternal(context, Uri(scheme: 'tel', path: store.phone), "Calling isn't available on this device.");
+  final phone = store.phone;
+  if (phone == null) return Future.value();
+  return launchExternal(context, Uri(scheme: 'tel', path: phone), "Calling isn't available on this device.");
 }
 
 enum StoreFilter {
@@ -140,7 +142,11 @@ class _StoresScreenState extends State<StoresScreen> {
                         hintStyle: TextStyle(color: c.hint),
                         prefixIcon: CMIcon(CMGlyph.search, color: c.muted),
                         suffixIcon: _search.text.isEmpty
-                            ? CMIcon(CMGlyph.locate, color: c.primaryInk)
+                            ? IconButton(
+                                tooltip: 'Stores near me',
+                                icon: CMIcon(CMGlyph.locate, color: c.primaryInk),
+                                onPressed: _nearMe,
+                              )
                             : IconButton(tooltip: 'Clear', icon: const CMIcon(CMGlyph.close), onPressed: _search.clear),
                       ),
                     ),
@@ -205,6 +211,17 @@ class _StoresScreenState extends State<StoresScreen> {
         ],
       ),
     );
+  }
+
+  /// Shows the map with the closest store picked.
+  void _nearMe() {
+    RewardsScope.read(context).haptic();
+    final nearest = ([...stores]..sort((a, b) => a.distance.compareTo(b.distance))).first;
+    setState(() {
+      _filter = StoreFilter.all;
+      _map = true;
+      _selected = nearest.number;
+    });
   }
 
   Widget _mapView(List<Store> results, DateTime now, RewardsState state) {
@@ -716,13 +733,15 @@ class StoreCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      CircleIconButton(
-                        icon: CMGlyph.phone,
-                        label: 'Call',
-                        size: 42,
-                        onTap: () => callStore(context, store),
-                      ),
-                      const SizedBox(width: 8),
+                      if (store.phone != null) ...[
+                        CircleIconButton(
+                          icon: CMGlyph.phone,
+                          label: 'Call',
+                          size: 42,
+                          onTap: () => callStore(context, store),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       SizedBox(
                         height: 42,
                         child: FilledButton.icon(
@@ -797,10 +816,12 @@ Future<void> showStoreSheet(BuildContext context, Store store) {
         const SizedBox(height: 18),
         Row(
           children: [
-            Expanded(
-              child: SecondaryButton(label: 'Call', icon: CMGlyph.phone, onPressed: () => callStore(context, store)),
-            ),
-            const SizedBox(width: 10),
+            if (store.phone != null) ...[
+              Expanded(
+                child: SecondaryButton(label: 'Call', icon: CMGlyph.phone, onPressed: () => callStore(context, store)),
+              ),
+              const SizedBox(width: 10),
+            ],
             Expanded(
               flex: 2,
               child: SizedBox(

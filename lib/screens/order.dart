@@ -1003,12 +1003,14 @@ class OrderTrackerScreen extends StatelessWidget {
                             label: 'Directions',
                             onTap: () => openDirections(context, store),
                           ),
-                          const SizedBox(width: 8),
-                          CircleIconButton(
-                            icon: CMGlyph.phone,
-                            label: 'Call store',
-                            onTap: () => callStore(context, store),
-                          ),
+                          if (store.phone != null) ...[
+                            const SizedBox(width: 8),
+                            CircleIconButton(
+                              icon: CMGlyph.phone,
+                              label: 'Call store',
+                              onTap: () => callStore(context, store),
+                            ),
+                          ],
                         ],
                       ),
                     ),
