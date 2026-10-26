@@ -151,7 +151,18 @@ class RewardsState extends ChangeNotifier {
   int get unlockedCount => rewards.where((r) => r.points <= points).length;
 
   List<AppNotification> get notifications =>
-      notificationFeed.where((n) => !dismissedNotifications.contains(n.id)).toList();
+      // The bundled feed is sample content; real notices need a push server.
+      (isDemo ? notificationFeed : const <AppNotification>[])
+          .where((n) => !dismissedNotifications.contains(n.id))
+          .toList();
+
+  /// How far along the member is in a challenge. Real progress comes from the
+  /// server; until then real builds show a fresh start, not the sample's.
+  int challengeProgress(Challenge challenge) => isDemo ? challenge.progress : 0;
+
+  /// Order Ahead sends orders to stores through the server, so only the demo
+  /// can place them for now (see docs/backend-api.md).
+  bool get canPlaceOrders => isDemo;
 
   int get unreadCount => notifications.where((n) => !readNotifications.contains(n.id)).length;
 
@@ -702,6 +713,7 @@ class RewardsState extends ChangeNotifier {
   }
 
   Order placeOrder({required int storeNumber, required int pickupMinutes, required String payment}) {
+    if (!canPlaceOrders) throw StateError('Order Ahead needs the CM Rewards server');
     final now = DateTime.now();
     final subtotal = cartSubtotal;
     final firstOrder = !hasOrdered;
