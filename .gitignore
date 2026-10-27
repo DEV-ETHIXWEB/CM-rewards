@@ -72,3 +72,7 @@ google-services.json
 # Built release artifacts
 /dist/
 /demo-release/
+
+# Vercel: SDK cloned by scripts/vercel_build.sh, and the CLI's local link
+/.flutter-sdk/
+.vercel/

@@ -46,6 +46,15 @@ Firebase Hosting, Cloudflare Pages). The web build talks to servers through
 the browser (`lib/data/platform_http_web.dart`); native builds keep their own
 client (`platform_http_io.dart`).
 
+**Vercel.** `vercel.json` is set up: import the repository with the framework
+preset left as "Other" and the settings in `vercel.json` apply. It runs
+`scripts/vercel_build.sh`, which installs Flutter (pinned; override with
+`FLUTTER_VERSION`) and builds the demo into `build/web`. No environment
+variables are needed for the demo. For a real build, set `CM_DEMO=false` plus
+`CM_API_URL`, `CM_PRIVACY_URL` and `CM_TERMS_URL` (and optionally
+`CM_SENTRY_DSN`, `CM_ENV`) in the Vercel project settings. These are compiled
+into public JavaScript, so never put secrets in them.
+
 ## Points economy
 
 | | |
