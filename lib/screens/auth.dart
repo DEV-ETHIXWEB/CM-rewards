@@ -282,7 +282,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // The status bar sits over the video on phones, over the form when side by side.
-      value: context.isExpandedWidth && !c.isDark ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+      value: context.isExpandedWidth
+          ? (c.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).withBrowserColor(c.background)
+          : SystemUiOverlayStyle.light.withBrowserColor(Brand.ink),
       child: Scaffold(
         body: context.isExpandedWidth
             // Wide screens: the film fills the left, the form sits on the right.

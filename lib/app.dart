@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'core/responsive.dart';
@@ -13,6 +14,18 @@ class CenterMarketsApp extends StatelessWidget {
   static final _light = buildTheme(CMColors.light);
   static final _dark = buildTheme(CMColors.dark);
 
+  /// In a browser, MaterialApp's color becomes the toolbar color whenever the
+  /// app rebuilds: the background of the theme in use, as each screen sets it.
+  Color? _browserColor() {
+    if (!kIsWeb) return null;
+    final dark = switch (state.themeMode) {
+      ThemeMode.dark => true,
+      ThemeMode.light => false,
+      ThemeMode.system => WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark,
+    };
+    return dark ? CMColors.dark.background : CMColors.light.background;
+  }
+
   @override
   Widget build(BuildContext context) {
     return RewardsScope(
@@ -21,6 +34,7 @@ class CenterMarketsApp extends StatelessWidget {
         listenable: state.appearance,
         builder: (context, _) => MaterialApp(
           title: 'Center Market Rewards',
+          color: _browserColor(),
           debugShowCheckedModeBanner: false,
           theme: _light,
           darkTheme: _dark,

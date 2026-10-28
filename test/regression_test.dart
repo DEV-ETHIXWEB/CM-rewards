@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:center_markets_rewards/main.dart';
+import 'package:center_markets_rewards/screens/home.dart';
 import 'package:center_markets_rewards/widgets/cm_icons.dart';
+import 'package:center_markets_rewards/widgets/motion.dart';
 
 Future<RewardsState> demo(WidgetTester tester) async {
   tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
@@ -59,6 +61,36 @@ void main() {
     expect(state.redeemedCount, 4);
     expect(state.wallet, hasLength(1));
     expect(find.text('Reward Redeemed!'), findsOneWidget);
+  });
+
+  testWidgets('Home sections scrolled back into view are there at once, not replaying their entrance', (tester) async {
+    // Animations on: this is about the entrance animation itself.
+    tester.view.physicalSize = const Size(1179, 2556);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final state = RewardsState()..signIn('', skipProfile: true);
+    await tester.pumpWidget(CenterMarketsApp(state: state));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+
+    final list = find
+        .descendant(
+          of: find.byType(HomeScreen),
+          matching: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down),
+        )
+        .first;
+    // Far enough that the lazy list disposes the top sections, then back.
+    await tester.drag(list, const Offset(0, -2400));
+    await tester.pumpAndSettle();
+    expect(find.byType(MemberCard), findsNothing);
+    await tester.drag(list, const Offset(0, 2400));
+    await tester.pump();
+
+    expect(find.byType(MemberCard), findsOneWidget);
+    for (final entrance in find.byType(FadeSlideIn).evaluate()) {
+      final opacity = find.descendant(of: find.byWidget(entrance.widget), matching: find.byType(Opacity)).first;
+      expect(tester.widget<Opacity>(opacity).opacity, 1);
+    }
   });
 
   testWidgets('Android back on another tab returns Home instead of closing', (tester) async {

@@ -8,27 +8,40 @@ import '../core/theme.dart';
 import '../data/catalog.dart';
 import 'motion.dart';
 
-/// The full-color logo. On dark surfaces it sits on an ivory plate so the
-/// burgundy wordmark keeps its contrast.
+/// The full-color logo, always on a transparent background. On dark surfaces
+/// it uses the dark-mode artwork, whose brighter burgundy keeps the wordmark
+/// legible without a plate behind it.
 class CMLogo extends StatelessWidget {
-  const CMLogo({super.key, this.height = 80, this.plate});
+  const CMLogo({super.key, this.height = 80, this.plate = false, this.onDark});
 
   final double height;
 
-  /// Forces the ivory plate on or off. Defaults to on in dark mode.
-  final bool? plate;
+  /// Sets the logo on an ivory plate, for photos and video where the
+  /// background behind it keeps changing.
+  final bool plate;
+
+  /// Whether the surface behind the logo is dark. Defaults to the theme's
+  /// brightness; pass false for light cards shown in dark mode.
+  final bool? onDark;
+
+  /// The image the logo draws at [height], decoded at that size. The splash
+  /// precaches it with this so the first frame of the logo is never blank.
+  static ImageProvider provider(BuildContext context, {required double height, bool onDark = false}) =>
+      ResizeImage.resizeIfNeeded(
+        null,
+        (height * MediaQuery.devicePixelRatioOf(context)).round(),
+        AssetImage(onDark ? logoDarkAsset : logoAsset),
+      );
 
   @override
   Widget build(BuildContext context) {
-    // Decoded at the size it's drawn, not the asset's full 926×607.
-    final image = Image.asset(
-      logoAsset,
+    final image = Image(
+      image: provider(context, height: height, onDark: !plate && (onDark ?? context.cm.isDark)),
       height: height,
-      cacheHeight: (height * MediaQuery.devicePixelRatioOf(context)).round(),
       fit: BoxFit.contain,
       semanticLabel: 'Center Market',
     );
-    if (!(plate ?? context.cm.isDark)) return image;
+    if (!plate) return image;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: height * 0.22, vertical: height * 0.14),
       decoration: BoxDecoration(color: Brand.ivory, borderRadius: BorderRadius.circular(height * 0.32)),
@@ -113,11 +126,15 @@ class _OrbitArcsPainter extends CustomPainter {
 /// Four dots, like the ones under "Market" in the logo. Pulses in sequence
 /// while [animating].
 class MarketDots extends StatefulWidget {
-  const MarketDots({super.key, this.color = Brand.green, this.size = 8, this.animating = true});
+  const MarketDots({super.key, this.color = Brand.green, this.size = 8, this.animating = true, this.phase = 0});
 
   final Color color;
   final double size;
   final bool animating;
+
+  /// Where in the pulse to start, from 0 to 1, to continue another set of
+  /// dots (the web page's loader) without a jump.
+  final double phase;
 
   @override
   State<MarketDots> createState() => _MarketDotsState();
@@ -144,7 +161,9 @@ class _MarketDotsState extends State<MarketDots> with SingleTickerProviderStateM
   void _sync() {
     final run = widget.animating && !MediaQuery.disableAnimationsOf(context);
     if (run && !_controller.isAnimating) {
-      _controller.repeat();
+      _controller
+        ..value = widget.phase
+        ..repeat();
     } else if (!run) {
       _controller.stop();
     }

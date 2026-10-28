@@ -114,7 +114,7 @@ class _MainShellState extends State<MainShell> with SingleTickerProviderStateMix
         if (!didPop) _select(0);
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: c.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        value: (c.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).withBrowserColor(c.background),
         child: Scaffold(
           extendBody: true,
           // Wide windows (iPad landscape, large tablets) get a side rail; phones a floating bar.

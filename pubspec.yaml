@@ -72,9 +72,12 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - assets/images/logo_dark.png
     - assets/photos/
     - assets/media/
     - assets/licenses/
+    # The app's emoji from Noto Color Emoji, for the web build only (lib/core/fallback_fonts.dart).
+    - assets/fonts/NotoColorEmoji-CM.woff2
 
   fonts:
     - family: Jakarta

@@ -70,7 +70,7 @@ class _MemberPassScreenState extends State<MemberPassScreen> {
     final clipped = deals.where((d) => state.clippedDeals.contains(d.id)).toList();
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: SystemUiOverlayStyle.light.withBrowserColor(Brand.burgundyDeep),
       child: Scaffold(
         backgroundColor: Brand.burgundyDeep,
         body: Stack(
@@ -163,7 +163,7 @@ class _MemberPassScreenState extends State<MemberPassScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 18, 16, 6),
                 child: Row(
                   children: [
-                    const CMLogo(height: 30, plate: false),
+                    const CMLogo(height: 30, onDark: false),
                     const Spacer(),
                     TierChip(tier: state.tier, onDark: false),
                   ],

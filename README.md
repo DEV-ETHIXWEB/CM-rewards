@@ -55,6 +55,24 @@ variables are needed for the demo. For a real build, set `CM_DEMO=false` plus
 `CM_SENTRY_DSN`, `CM_ENV`) in the Vercel project settings. These are compiled
 into public JavaScript, so never put secrets in them.
 
+**Keeping the web build smooth.** Before its first frame a browser has to
+download the app (1 MB compressed) and Flutter's renderer (1.5 to 3 MB,
+depending on the browser, cached across visits), so:
+
+- `web/index.html` shows the splash's four dots while it loads and preloads
+  the logo and emoji font; the Flutter splash continues the same dots in step
+  (`lib/core/splash_handoff_web.dart`) and starts once the logo is decoded.
+- Emoji come from a 32 KB cut of Noto Color Emoji
+  (`assets/fonts/NotoColorEmoji-CM.woff2`, loaded in `lib/core/fallback_fonts.dart`).
+  Without it Flutter downloads 1.75 MB of emoji fonts on demand and re-lays
+  out the app each time one arrives. A new emoji fails
+  `test/fallback_fonts_test.dart` until it's added; the file says how.
+- Home's store film shows its still on the web: a `<video>` inside a
+  scrolling list is moved by the browser separately from the app and made
+  scrolling stutter. The sign-in screen and native builds keep the film.
+- `vercel.json` caches photos, fonts and media for an hour (then serves them
+  while revalidating); the app's code is always revalidated.
+
 ## Points economy
 
 | | |

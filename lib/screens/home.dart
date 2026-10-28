@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/format.dart';
@@ -1134,7 +1135,13 @@ class StoryVideoCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            const BrandVideo(),
+            // In a browser a video is a separate page element that has to be
+            // moved in step with the app on every frame of a scroll, which
+            // made Home stutter past this card; the web shows its still.
+            if (kIsWeb)
+              const BrandPhoto(brandVideoPoster, semanticLabel: 'Inside a Center Market store')
+            else
+              const BrandVideo(),
             // Two layers: a soft wash over the whole film, and a deep fade where the text sits.
             ColoredBox(color: Brand.burgundyDeep.withValues(alpha: 0.18)),
             const Scrim(from: 0.05, opacity: 0.96, color: Brand.burgundyDeep),

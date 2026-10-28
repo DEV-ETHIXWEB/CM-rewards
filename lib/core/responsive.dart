@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 /// Window-size breakpoints, in logical pixels. They follow the window, not the
 /// device, so iPad Split View and foldables get the layout that fits.
@@ -68,23 +69,101 @@ class EdgeFade extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final window = MediaQuery.sizeOf(context).width;
-    // Decided at paint time from the painted width, rather than with a
-    // LayoutBuilder, so this still works inside IntrinsicHeight.
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (bounds) {
-        final fade = always || bounds.width < window - 1;
-        final stop = fade ? (width / bounds.width).clamp(0.0, 0.5) : 0.0;
-        return LinearGradient(
-          colors: fade
-              ? const [Color(0x00000000), Color(0xFF000000), Color(0xFF000000), Color(0x00000000)]
-              : const [Color(0xFF000000), Color(0xFF000000), Color(0xFF000000), Color(0xFF000000)],
-          stops: [0, start ? stop : 0, 1 - stop, 1],
-        ).createShader(bounds);
-      },
+    return _EdgeFade(
+      window: MediaQuery.sizeOf(context).width,
+      width: width,
+      start: start,
+      always: always,
       child: child,
     );
+  }
+}
+
+class _EdgeFade extends SingleChildRenderObjectWidget {
+  const _EdgeFade({required this.window, required this.width, required this.start, required this.always, super.child});
+
+  final double window;
+  final double width;
+  final bool start;
+  final bool always;
+
+  @override
+  _RenderEdgeFade createRenderObject(BuildContext context) => _RenderEdgeFade(window, width, start, always);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderEdgeFade renderObject) {
+    renderObject
+      ..window = window
+      ..width = width
+      ..start = start
+      ..always = always;
+  }
+}
+
+/// Decides at paint time from the painted width, rather than with a
+/// LayoutBuilder, so it still works inside IntrinsicHeight. Edge to edge it
+/// paints the child directly: no mask layer, so scrolling costs nothing extra.
+class _RenderEdgeFade extends RenderProxyBox {
+  _RenderEdgeFade(this._window, this._width, this._start, this._always);
+
+  double _window;
+  set window(double value) => _set(_window != value, () => _window = value);
+
+  double _width;
+  set width(double value) => _set(_width != value, () => _width = value);
+
+  bool _start;
+  set start(bool value) => _set(_start != value, () => _start = value);
+
+  bool _always;
+  set always(bool value) => _set(_always != value, () => _always = value);
+
+  void _set(bool changed, VoidCallback apply) {
+    if (!changed) return;
+    apply();
+    _syncCompositing();
+    markNeedsPaint();
+  }
+
+  bool get _fades => _always || (hasSize && size.width < _window - 1);
+  bool? _lastFades;
+
+  // Only a fading row pushes a layer, and whether it fades depends on its size.
+  void _syncCompositing() {
+    if (_lastFades == _fades) return;
+    _lastFades = _fades;
+    markNeedsCompositingBitsUpdate();
+  }
+
+  @override
+  bool get alwaysNeedsCompositing => child != null && _fades;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    _syncCompositing();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null) return;
+    if (!_fades) {
+      layer = null;
+      context.paintChild(child, offset);
+      return;
+    }
+    final stop = (_width / size.width).clamp(0.0, 0.5);
+    final shader = LinearGradient(
+      colors: const [Color(0x00000000), Color(0xFF000000), Color(0xFF000000), Color(0x00000000)],
+      stops: [0, _start ? stop : 0, 1 - stop, 1],
+    ).createShader(Offset.zero & size);
+    final mask = (layer as ShaderMaskLayer?) ?? ShaderMaskLayer();
+    mask
+      ..shader = shader
+      ..maskRect = offset & size
+      ..blendMode = BlendMode.dstIn;
+    layer = context.pushLayer(mask, (context, offset) => context.paintChild(child, offset), offset) as ShaderMaskLayer?;
   }
 }
 

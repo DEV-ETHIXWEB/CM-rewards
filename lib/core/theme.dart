@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../widgets/cm_icons.dart';
+import 'fallback_fonts.dart';
 
 // ─── Brand ────────────────────────────────────────────────────────────────────
 
@@ -213,11 +215,19 @@ class AppText {
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 
+extension BrowserChrome on SystemUiOverlayStyle {
+  /// In a browser, also tints the browser's own toolbar (the page's
+  /// theme-color) to [color], the color at the top of the screen, so the app
+  /// and the browser read as one surface. Native status bars stay transparent.
+  SystemUiOverlayStyle withBrowserColor(Color color) => kIsWeb ? copyWith(statusBarColor: color) : this;
+}
+
 ThemeData buildTheme(CMColors c) {
   final base = ThemeData(
     useMaterial3: true,
     brightness: c.brightness,
     fontFamily: AppText.sans,
+    fontFamilyFallback: kIsWeb ? const [emojiFontFamily] : null,
     colorScheme: ColorScheme.fromSeed(
       seedColor: Brand.burgundy,
       brightness: c.brightness,
@@ -228,13 +238,15 @@ ThemeData buildTheme(CMColors c) {
       error: c.danger,
     ),
   );
-  final overlay = c.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark;
+  final overlay = (c.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).withBrowserColor(c.background);
 
   return base.copyWith(
     extensions: [c],
     scaffoldBackgroundColor: c.background,
     textTheme: base.textTheme.apply(bodyColor: c.ink, displayColor: c.ink, fontFamily: AppText.sans),
-    splashFactory: InkSparkle.splashFactory,
+    // The sparkle is a shader the browser compiles on the first tap; the web
+    // build uses the plain ripple so the first tap responds at once.
+    splashFactory: kIsWeb ? InkRipple.splashFactory : InkSparkle.splashFactory,
     dividerColor: c.line,
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {

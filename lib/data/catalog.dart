@@ -5,6 +5,9 @@ import '../widgets/cm_icons.dart';
 
 const _photos = 'assets/photos';
 const logoAsset = 'assets/images/logo.png';
+
+/// The same artwork with the burgundy lifted to the dark-mode burgundy, for dark surfaces.
+const logoDarkAsset = 'assets/images/logo_dark.png';
 const brandVideo = 'assets/media/cm_store.mp4';
 const brandVideoPoster = '$_photos/video_poster.jpg';
 const aerialPhoto = '$_photos/aerial.jpg';

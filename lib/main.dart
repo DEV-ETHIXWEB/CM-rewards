@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'app.dart';
 import 'core/errors.dart';
+import 'core/fallback_fonts.dart';
 import 'core/responsive.dart';
 import 'state/rewards_state.dart';
 
@@ -13,6 +14,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ErrorReporting.run(() async {
     registerFontLicenses();
+    await loadEmojiFont();
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     await _lockPhonesToPortrait();
     final state = await RewardsState.load();

@@ -109,7 +109,11 @@ class _FriendlyError extends StatelessWidget {
 /// Registers the bundled fonts' licenses so they appear on the licenses page.
 void registerFontLicenses() {
   LicenseRegistry.addLicense(() async* {
-    for (final (font, file) in [('Plus Jakarta Sans', 'PlusJakartaSans'), ('Zilla Slab', 'ZillaSlab')]) {
+    for (final (font, file) in [
+      ('Plus Jakarta Sans', 'PlusJakartaSans'),
+      ('Zilla Slab', 'ZillaSlab'),
+      ('Noto Color Emoji', 'NotoColorEmoji'),
+    ]) {
       final text = await rootBundle.loadString('assets/licenses/$file-OFL.txt');
       yield LicenseEntryWithLineBreaks([font], text);
     }

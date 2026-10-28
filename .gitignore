@@ -64,9 +64,10 @@ google-services.json
 /build/symbols/
 
 # Local-only material: brand source files, sales PDFs and old backups.
-# Only assets/images/logo.png ships in the app.
+# Only the logo (and its dark-mode version) ships in the app.
 /assets/images/*
 !/assets/images/logo.png
+!/assets/images/logo_dark.png
 /.backup/
 
 # Built release artifacts

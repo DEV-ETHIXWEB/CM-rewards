@@ -8,7 +8,9 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Interactive demo of the Center Market rewards app. Sample data only.">
-  <meta name="theme-color" content="#FAF6F1">
+  <!-- Browser chrome matches the splash; the app updates it per screen once running. -->
+  <meta id="flutterweb-theme" name="theme-color" content="#FAF6F1">
+  <meta name="color-scheme" content="light dark">
 
   <!-- Add to Home Screen on iPhone and iPad -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -21,24 +23,66 @@
   <title>CM Rewards Demo</title>
   <link rel="manifest" href="manifest.json">
 
+  <!-- Needed for the first frames (the splash's logo, the app's emoji font):
+       fetch them while the engine downloads instead of after. Flutter loads
+       assets with fetch(), so these requests are reused, not repeated. -->
+  <link rel="preload" href="assets/assets/images/logo.png" as="fetch" crossorigin>
+  <link rel="preload" href="assets/assets/fonts/NotoColorEmoji-CM.woff2" as="fetch" crossorigin>
+
   <style>
-    /* Matches the native launch screen: the logo on ivory while the app loads. */
+    /* Ivory in light and dark mode, like the native launch screen and the
+       app's splash, so opening the app is one continuous brand moment. */
     html, body { margin: 0; height: 100%; background: #FAF6F1; }
+
+    /* The splash's four market dots, pulsing while the engine loads. Same
+       size, spacing, colour, rhythm and position as MarketDots on the Flutter
+       splash, which takes over seamlessly underneath on its first frame. */
     #cm-splash {
-      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      background: #FAF6F1; transition: opacity 300ms ease; z-index: 10;
+      position: fixed; inset: 0; z-index: 10; background: #FAF6F1;
+      transition: opacity 240ms cubic-bezier(0.2, 0, 0, 1);
     }
-    #cm-splash img { width: min(44vw, 220px); height: auto; }
     #cm-splash.done { opacity: 0; pointer-events: none; }
+    #cm-splash .dots {
+      position: absolute; left: 0; right: 0; bottom: 48px;
+      display: flex; justify-content: center;
+    }
+    #cm-splash .dots i {
+      width: 7px; height: 7px; margin: 0 3.15px; border-radius: 50%;
+      background: #168A3B; transform: scale(0.6);
+      animation: cm-pulse 1100ms linear infinite;
+    }
+    #cm-splash .dots i:nth-child(2) { animation-delay: 176ms; }
+    #cm-splash .dots i:nth-child(3) { animation-delay: 352ms; }
+    #cm-splash .dots i:nth-child(4) { animation-delay: 528ms; }
+    /* 0.6 + 0.5 * max(0, sin(2πt)): a half-sine swell, then rest. */
+    @keyframes cm-pulse {
+      0%   { transform: scale(0.6); }
+      8%   { transform: scale(0.849); }
+      16%  { transform: scale(1.032); }
+      25%  { transform: scale(1.1); }
+      34%  { transform: scale(1.032); }
+      42%  { transform: scale(0.849); }
+      50%, 100% { transform: scale(0.6); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #cm-splash .dots i { animation: none; transform: none; }
+    }
   </style>
 </head>
 <body>
-  <div id="cm-splash" aria-hidden="true"><img src="splash-logo.png" alt=""></div>
+  <div id="cm-splash" aria-hidden="true"><div class="dots"><i></i><i></i><i></i><i></i></div></div>
   <script>
+    // Where the dots are in their 1.1s pulse (0 to 1), so the Flutter splash
+    // starts its own dots in step with these (lib/core/splash_handoff_web.dart).
+    window.cmSplashPhase = function () {
+      var dot = document.querySelector('#cm-splash .dots i');
+      var animations = dot && dot.getAnimations ? dot.getAnimations() : [];
+      return animations.length ? (animations[0].currentTime % 1100) / 1100 : 0;
+    };
     window.addEventListener('flutter-first-frame', function () {
       var splash = document.getElementById('cm-splash');
       splash.classList.add('done');
-      setTimeout(function () { splash.remove(); }, 400);
+      setTimeout(function () { splash.remove(); }, 300);
     });
   </script>
   <script src="flutter_bootstrap.js" async></script>

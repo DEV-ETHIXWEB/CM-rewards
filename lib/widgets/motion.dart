@@ -7,6 +7,10 @@ import '../core/theme.dart';
 import '../state/rewards_state.dart';
 
 /// Fades and slides its child up into place, optionally after a delay.
+///
+/// It's an entrance: it plays when the screen first appears. Lazy lists
+/// rebuild children that scroll back into range, and those appear in place
+/// rather than replaying the entrance mid-scroll.
 class FadeSlideIn extends StatefulWidget {
   const FadeSlideIn({super.key, required this.child, this.delay = Duration.zero, this.offset = 20});
 
@@ -29,7 +33,12 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    if (widget.delay == Duration.zero) {
+    // Built after the list has been scrolled: a child coming back into view.
+    final scrollable = context.findAncestorStateOfType<ScrollableState>();
+    final position = scrollable?.position;
+    if (position != null && position.hasContentDimensions && (position.pixels - position.minScrollExtent).abs() > 1) {
+      _controller.value = 1;
+    } else if (widget.delay == Duration.zero) {
       _controller.forward();
     } else {
       _timer = Timer(widget.delay, () {
@@ -120,10 +129,11 @@ class _PressableState extends State<Pressable> {
                 widget.onTap!();
               }
             : null,
+        // Presses in quickly and firmly, then glides back to rest.
         child: AnimatedScale(
           scale: _down ? widget.scale : 1,
-          duration: Motion.fast,
-          curve: Motion.standard,
+          duration: _down ? const Duration(milliseconds: 110) : Motion.medium,
+          curve: _down ? Curves.easeOut : Motion.emphasized,
           child: widget.child,
         ),
       ),
@@ -172,23 +182,41 @@ class Shine extends StatefulWidget {
 }
 
 class _ShineState extends State<Shine> with SingleTickerProviderStateMixin {
+  // Only the sweep is animated; the rest between sweeps is a timer, so the
+  // card asks for no frames while it sits still.
+  static const _rest = Duration(milliseconds: 3640);
+
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 5200),
-  );
+    duration: const Duration(milliseconds: 1560),
+  )..addStatusListener(_onStatus);
+  Timer? _timer;
+  bool _enabled = false;
+
+  void _onStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    _timer = Timer(_rest, () {
+      if (mounted && _enabled) _controller.forward(from: 0);
+    });
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _controller.stop();
-    } else if (!_controller.isAnimating) {
-      _controller.repeat();
+    final enabled = !MediaQuery.disableAnimationsOf(context);
+    if (enabled == _enabled) return;
+    _enabled = enabled;
+    _timer?.cancel();
+    if (enabled) {
+      _controller.forward(from: 0);
+    } else {
+      _controller.value = 1;
     }
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -202,8 +230,7 @@ class _ShineState extends State<Shine> with SingleTickerProviderStateMixin {
           return AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
-              // Sweep during the first 30% of each cycle, then rest.
-              final t = Curves.easeInOut.transform((_controller.value / 0.3).clamp(0.0, 1.0));
+              final t = Curves.easeInOut.transform(_controller.value);
               return Transform.translate(offset: Offset(-width * 0.8 + t * width * 2.2, 0), child: child);
             },
             child: Transform.rotate(
