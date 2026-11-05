@@ -9,8 +9,9 @@ import '../data/catalog.dart';
 import 'motion.dart';
 
 /// The full-color logo, always on a transparent background. On dark surfaces
-/// it uses the dark-mode artwork, whose brighter burgundy keeps the wordmark
-/// legible without a plate behind it.
+/// it uses the dark-mode artwork (`scripts/make_dark_logo.py`), which paints
+/// the wordmark ivory and lifts the swooshes, so the mark stays crisp on
+/// near-black without a plate behind it.
 class CMLogo extends StatelessWidget {
   const CMLogo({super.key, this.height = 80, this.plate = false, this.onDark});
 

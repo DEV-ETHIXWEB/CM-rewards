@@ -81,14 +81,15 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
     );
+    final now = DateTime.now();
     final greeting = _pad(
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            state.firstName.isEmpty ? _greeting() : '${_greeting()},',
-            style: TextStyle(fontSize: 15, color: c.muted, fontWeight: FontWeight.w600),
-          ),
+          // Set as a dateline rather than a sentence: it reads as a masthead,
+          // and it quietly dates the demo's sample data.
+          Eyebrow('${_greeting()} · ${weekdays[now.weekday - 1]} ${months[now.month - 1]} ${now.day}'),
+          const SizedBox(height: 7),
           Text(state.firstName.isEmpty ? 'Welcome' : state.firstName, style: AppText.display),
         ],
       ),
@@ -207,11 +208,16 @@ class HomeScreen extends StatelessWidget {
       ),
     ];
 
+    // The masthead runs full-bleed to the very top, so its top inset is laid
+    // out inside the list rather than clipped off by a SafeArea around it.
+    final topInset = MediaQuery.paddingOf(context).top;
     return SafeArea(
+      top: false,
       bottom: false,
       child: RefreshIndicator(
         color: c.primary,
         backgroundColor: c.surface,
+        edgeOffset: topInset,
         onRefresh: () => _refresh(context),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -220,11 +226,20 @@ class HomeScreen extends StatelessWidget {
             final columns = constraints.maxWidth >= Breakpoints.wideHome;
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-              padding: EdgeInsets.only(top: 10, bottom: bottomInset(context)),
+              padding: EdgeInsets.only(bottom: bottomInset(context)),
               children: [
-                reveal(0, header),
-                const SizedBox(height: 22),
-                reveal(1, greeting),
+                _Masthead(
+                  topInset: topInset,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(height: topInset + 10),
+                      reveal(0, header),
+                      const SizedBox(height: 22),
+                      reveal(1, greeting),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 18),
                 if (!columns) ...[
                   ...mine,
@@ -262,6 +277,63 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+/// The brand's swooshes, bled off the top corner, behind a warm wash. It gives
+/// the top of the page the logo's own geometry instead of a blank slab, and
+/// carries the member card's burgundy up to the status bar.
+class _Masthead extends StatelessWidget {
+  const _Masthead({required this.child, required this.topInset});
+
+  final Widget child;
+
+  /// The status bar height the band runs behind, so the swooshes stay pinned
+  /// to the header row rather than drifting off the top of a tall device.
+  final double topInset;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cm;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                // Straight down, so the wash is gone by the band's last row at
+                // any width. A radial one looks richer on a phone but leaves a
+                // hard edge where a wide window cuts the circle off.
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    c.primary.withValues(alpha: c.isDark ? 0.24 : 0.09),
+                    c.primary.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: -126,
+          top: topInset - 100,
+          width: 320,
+          height: 228,
+          // Mirrored, so the member card below is echoed rather than repeated:
+          // the thick ends of these crescents run off the edge and only the
+          // hairline tails sweep back across the page.
+          child: Transform.scale(
+            scaleX: -1,
+            child: OrbitArcs(opacity: c.isDark ? 0.11 : 0.06, colors: [c.primary, c.positive, c.primary]),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
+/// Quiet by design: a demo badge should date the sample data, not shout over
+/// the logo it sits next to.
 class _DemoTag extends StatelessWidget {
   const _DemoTag();
 
@@ -274,13 +346,12 @@ class _DemoTag extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
           decoration: BoxDecoration(
-            color: c.positiveSoft,
             borderRadius: BorderRadius.circular(Radii.sm),
-            border: Border.all(color: c.positiveInk.withValues(alpha: 0.25)),
+            border: Border.all(color: c.accentInk.withValues(alpha: 0.45)),
           ),
           child: Text(
             'DEMO',
-            style: TextStyle(color: c.positiveInk, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2),
+            style: TextStyle(color: c.accentInk, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.4),
           ),
         ),
       ),
@@ -521,11 +592,21 @@ class _MomentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.cm;
     final hour = DateTime.now().hour;
-    final (emoji, title, body) = switch (hour) {
-      < 10 => ('☕', 'Coffee earns 2× before 10 AM', 'Skip the line: order ahead and it’s waiting at the counter.'),
-      < 14 => ('🍗', 'Lunch is hot and ready', 'Tenders basket, jojos and a drink. Order ahead in seconds.'),
-      < 18 => ('🧊', 'Afternoon pick-me-up', 'Any size Icee is \$1.49 today. Clip it and it applies at checkout.'),
-      _ => ('🍕', 'Pizza night, sorted', 'Grab a whole 16" for the crew. Ready in about 15 minutes.'),
+    // The house icon set, not emoji: the glyphs are drawn to the same weight
+    // as the rest of the app, and they look the same on every platform.
+    final (glyph, title, body) = switch (hour) {
+      < 10 => (
+        CMGlyph.cup,
+        'Coffee earns 2× before 10 AM',
+        'Skip the line: order ahead and it’s waiting at the counter.',
+      ),
+      < 14 => (CMGlyph.food, 'Lunch is hot and ready', 'Tenders basket, jojos and a drink. Order ahead in seconds.'),
+      < 18 => (
+        CMGlyph.icee,
+        'Afternoon pick-me-up',
+        'Any size Icee is \$1.49 today. Clip it and it applies at checkout.',
+      ),
+      _ => (CMGlyph.pizza, 'Pizza night, sorted', 'Grab a whole 16" for the crew. Ready in about 15 minutes.'),
     };
     return Pressable(
       scale: 0.98,
@@ -535,7 +616,7 @@ class _MomentCard extends StatelessWidget {
         decoration: BoxDecoration(color: c.positiveSoft, borderRadius: BorderRadius.circular(Radii.md)),
         child: Row(
           children: [
-            IconTile(emoji: emoji, background: c.surface, size: 46),
+            IconTile(icon: glyph, color: c.positiveInk, background: c.surface, size: 46),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -567,46 +648,50 @@ class _QuickActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.cm;
     final actions = [
-      (CMGlyph.bagFill, 'Order\nahead', c.primaryInk, c.primarySoft, () => onNavigate(AppTab.order)),
-      (CMGlyph.fuel, 'Fuel\nprices', c.positiveInk, c.positiveSoft, () => showFuelSheet(context)),
-      (CMGlyph.handHeart, 'Gift\npoints', c.primaryInk, c.primarySoft, () => showGiftSheet(context)),
-      (CMGlyph.people, 'Refer &\nearn', c.positiveInk, c.positiveSoft, () => showReferralSheet(context)),
+      (CMGlyph.bagFill, 'Order\nahead', c.primaryInk, () => onNavigate(AppTab.order)),
+      (CMGlyph.fuel, 'Fuel\nprices', c.positiveInk, () => showFuelSheet(context)),
+      (CMGlyph.handHeart, 'Gift\npoints', c.primaryInk, () => showGiftSheet(context)),
+      (CMGlyph.people, 'Refer &\nearn', c.positiveInk, () => showReferralSheet(context)),
     ];
 
-    return Row(
-      children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) const SizedBox(width: 10),
-          Expanded(
-            child: Pressable(
-              onTap: actions[i].$5,
-              semanticLabel: actions[i].$2.replaceAll('\n', ' '),
-              child: Panel(
-                padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-                radius: 22,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IconTile(icon: actions[i].$1, color: actions[i].$3, background: actions[i].$4, size: 38),
-                    const SizedBox(height: 12),
-                    // Shrinks rather than breaking a word when text is very large.
-                    ExcludeSemantics(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          actions[i].$2,
-                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.2),
+    // One object with hairline divisions, not four floating tiles: it reads as
+    // a single instrument panel and leaves the member card as the only hero.
+    return Panel(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < actions.length; i++) ...[
+              if (i > 0) VerticalDivider(width: 1, thickness: 1, indent: 2, endIndent: 2, color: c.line),
+              Expanded(
+                child: Pressable(
+                  onTap: actions[i].$4,
+                  semanticLabel: actions[i].$2.replaceAll('\n', ' '),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CMIcon(actions[i].$1, color: actions[i].$3, size: 23),
+                      const SizedBox(height: 10),
+                      // Shrinks rather than breaking a word when text is very large.
+                      ExcludeSemantics(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            actions[i].$2,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.25),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        ],
-      ],
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
